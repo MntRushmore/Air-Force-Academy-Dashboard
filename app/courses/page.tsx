@@ -26,10 +26,11 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 
 export default function CoursesPage() {
   // Use Dexie's useLiveQuery hook to get real-time updates from the database
-  const courses = useLiveQuery(() => db.courses.orderBy("createdAt").reverse().toArray(), []) || []
+  const courses = useLiveQuery(() => db.courses.orderBy("year").reverse().toArray(), []) || []
   const grades = useLiveQuery(() => db.grades.toArray(), []) || []
 
   const [newCourse, setNewCourse] = useState<Partial<Course>>({
@@ -49,6 +50,7 @@ export default function CoursesPage() {
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [importStatus, setImportStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [importError, setImportError] = useState("")
+  const [yearFilter, setYearFilter] = useState<number | "all">("all")
 
   // Reset selected course when courses change
   useEffect(() => {
@@ -59,6 +61,12 @@ export default function CoursesPage() {
       }
     }
   }, [courses, selectedCourse])
+
+  // Get unique years from courses
+  const years = [...new Set(courses.map((course) => course.year))].sort((a, b) => b - a)
+
+  // Filter courses by year if a year is selected
+  const filteredCourses = yearFilter === "all" ? courses : courses.filter((course) => course.year === yearFilter)
 
   const addCourse = async () => {
     if (!newCourse.code || !newCourse.name) return
@@ -236,6 +244,18 @@ export default function CoursesPage() {
     return points
   }
 
+  // Group courses by year
+  const coursesByYear = filteredCourses.reduce(
+    (acc, course) => {
+      if (!acc[course.year]) {
+        acc[course.year] = []
+      }
+      acc[course.year].push(course)
+      return acc
+    },
+    {} as Record<number, Course[]>,
+  )
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
@@ -268,7 +288,6 @@ export default function CoursesPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card className="bg-gradient-to-br from-[#0033a0] to-[#003db8] text-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">STEM Courses</CardTitle>
@@ -311,71 +330,103 @@ export default function CoursesPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {courses.map((course) => {
-                const { percentage, letterGrade } = calculateCourseGrade(course.id || "")
-                const gradeColor = getCourseGradeColor(percentage)
+            <>
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Your Courses</h2>
+                <Select
+                  value={yearFilter === "all" ? "all" : yearFilter.toString()}
+                  onValueChange={(value) => setYearFilter(value === "all" ? "all" : Number.parseInt(value))}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Years</SelectItem>
+                    {years.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                return (
-                  <Card
-                    key={course.id}
-                    className={`overflow-hidden transition-all hover:shadow-md ${
-                      selectedCourse?.id === course.id ? "ring-2 ring-[#0033a0]" : ""
-                    }`}
-                    onClick={() => setSelectedCourse(course)}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault()
-                        setSelectedCourse(course)
-                      }
-                    }}
-                    role="button"
-                    aria-pressed={selectedCourse?.id === course.id}
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="flex items-center">
-                            {course.code}
-                            {course.isAP && (
-                              <span className="ml-2 rounded-full bg-[#0033a0] px-2 py-0.5 text-xs font-medium text-white">
-                                AP
-                              </span>
-                            )}
-                          </CardTitle>
-                          <CardDescription>{course.name}</CardDescription>
-                        </div>
-                        <div className={`text-xl font-bold ${gradeColor}`}>{letterGrade}</div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Grade:</span>
-                          <span className={`font-medium ${gradeColor}`}>{percentage.toFixed(1)}%</span>
-                        </div>
-                        <Progress value={percentage} className="h-2" />
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Credits:</span>
-                          <span>{course.credits}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Category:</span>
-                          <span>{course.category}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Term:</span>
-                          <span>
-                            {course.semester} {course.year}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
+              {Object.entries(coursesByYear)
+                .sort(([yearA], [yearB]) => Number.parseInt(yearB) - Number.parseInt(yearA))
+                .map(([year, yearCourses]) => (
+                  <div key={year} className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-medium">{year}</h3>
+                      <Badge variant="outline">{yearCourses.length} courses</Badge>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {yearCourses.map((course) => {
+                        const { percentage, letterGrade } = calculateCourseGrade(course.id || "")
+                        const gradeColor = getCourseGradeColor(percentage)
+
+                        return (
+                          <Card
+                            key={course.id}
+                            className={`overflow-hidden transition-all hover:shadow-md ${
+                              selectedCourse?.id === course.id ? "ring-2 ring-primary" : ""
+                            }`}
+                            onClick={() => setSelectedCourse(course)}
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                setSelectedCourse(course)
+                              }
+                            }}
+                            role="button"
+                            aria-pressed={selectedCourse?.id === course.id}
+                          >
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <CardTitle className="flex items-center">
+                                    {course.code}
+                                    {course.isAP && (
+                                      <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
+                                        AP
+                                      </span>
+                                    )}
+                                  </CardTitle>
+                                  <CardDescription>{course.name}</CardDescription>
+                                </div>
+                                <div className={`text-xl font-bold ${gradeColor}`}>{letterGrade}</div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Grade:</span>
+                                  <span className={`font-medium ${gradeColor}`}>{percentage.toFixed(1)}%</span>
+                                </div>
+                                <Progress value={percentage} className="h-2" />
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Credits:</span>
+                                  <span>{course.credits}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Category:</span>
+                                  <span>{course.category}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Term:</span>
+                                  <span>
+                                    {course.semester} {course.year}
+                                  </span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+            </>
           )}
 
           {selectedCourse && (
@@ -386,7 +437,7 @@ export default function CoursesPage() {
                     <CardTitle className="flex items-center">
                       {selectedCourse.code}
                       {selectedCourse.isAP && (
-                        <span className="ml-2 rounded-full bg-[#0033a0] px-2 py-0.5 text-xs font-medium text-white">
+                        <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                           AP
                         </span>
                       )}
@@ -540,7 +591,9 @@ export default function CoursesPage() {
                   <Input
                     id="course-code"
                     value={newCourse.code}
-                    onChange={(e) => setNewCourse({ ...newCourse, code: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewCourse({ ...newCourse, code: e.target.value })
+                    }
                     placeholder="e.g., MATH101"
                   />
                 </div>
@@ -549,7 +602,9 @@ export default function CoursesPage() {
                   <Input
                     id="course-name"
                     value={newCourse.name}
-                    onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewCourse({ ...newCourse, name: e.target.value })
+                    }
                     placeholder="e.g., Calculus I"
                   />
                 </div>
@@ -561,7 +616,9 @@ export default function CoursesPage() {
                   <Input
                     id="course-instructor"
                     value={newCourse.instructor}
-                    onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewCourse({ ...newCourse, instructor: e.target.value })
+                    }
                     placeholder="e.g., Dr. Smith"
                   />
                 </div>
@@ -573,7 +630,9 @@ export default function CoursesPage() {
                     min="0"
                     max="6"
                     value={newCourse.credits}
-                    onChange={(e) => setNewCourse({ ...newCourse, credits: Number(e.target.value) })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewCourse({ ...newCourse, credits: Number(e.target.value) })
+                    }
                   />
                 </div>
               </div>
@@ -604,7 +663,9 @@ export default function CoursesPage() {
                     min="2000"
                     max="2100"
                     value={newCourse.year}
-                    onChange={(e) => setNewCourse({ ...newCourse, year: Number(e.target.value) })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewCourse({ ...newCourse, year: Number(e.target.value) })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -633,7 +694,7 @@ export default function CoursesPage() {
                 <Switch
                   id="course-ap"
                   checked={newCourse.isAP}
-                  onCheckedChange={(checked) => setNewCourse({ ...newCourse, isAP: checked })}
+                  onChange={(checked: boolean) => setNewCourse({ ...newCourse, isAP: checked })}
                 />
                 <Label htmlFor="course-ap">This is an Advanced Placement (AP) course</Label>
               </div>
@@ -643,7 +704,9 @@ export default function CoursesPage() {
                 <Textarea
                   id="course-notes"
                   value={newCourse.notes}
-                  onChange={(e) => setNewCourse({ ...newCourse, notes: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    setNewCourse({ ...newCourse, notes: e.target.value })
+                  }
                   placeholder="Any additional notes about the course"
                   rows={3}
                 />
@@ -809,7 +872,7 @@ function AddGradeForm({ courseId }: { courseId: string }) {
           <Input
             id="grade-title"
             value={newGrade.title}
-            onChange={(e) => setNewGrade({ ...newGrade, title: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewGrade({ ...newGrade, title: e.target.value })}
             placeholder="e.g., Midterm Exam"
           />
         </div>
@@ -841,7 +904,7 @@ function AddGradeForm({ courseId }: { courseId: string }) {
               id="grade-date"
               type="date"
               value={newGrade.date}
-              onChange={(e) => setNewGrade({ ...newGrade, date: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewGrade({ ...newGrade, date: e.target.value })}
             />
           </div>
         </div>
@@ -855,7 +918,9 @@ function AddGradeForm({ courseId }: { courseId: string }) {
               min="0"
               step="0.01"
               value={newGrade.score}
-              onChange={(e) => setNewGrade({ ...newGrade, score: Number(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setNewGrade({ ...newGrade, score: Number(e.target.value) })
+              }
             />
           </div>
           <div className="space-y-2">
@@ -866,7 +931,9 @@ function AddGradeForm({ courseId }: { courseId: string }) {
               min="0"
               step="0.01"
               value={newGrade.maxScore}
-              onChange={(e) => setNewGrade({ ...newGrade, maxScore: Number(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setNewGrade({ ...newGrade, maxScore: Number(e.target.value) })
+              }
             />
           </div>
           <div className="space-y-2">
@@ -877,7 +944,9 @@ function AddGradeForm({ courseId }: { courseId: string }) {
               min="0"
               max="100"
               value={newGrade.weight}
-              onChange={(e) => setNewGrade({ ...newGrade, weight: Number(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setNewGrade({ ...newGrade, weight: Number(e.target.value) })
+              }
             />
           </div>
         </div>
@@ -887,7 +956,9 @@ function AddGradeForm({ courseId }: { courseId: string }) {
           <Textarea
             id="grade-notes"
             value={newGrade.notes}
-            onChange={(e) => setNewGrade({ ...newGrade, notes: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+              setNewGrade({ ...newGrade, notes: e.target.value })
+            }
             placeholder="Any additional notes about this grade"
             rows={2}
           />

@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Pause, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -20,39 +20,75 @@ export function PomodoroTimer() {
   const [timeLeft, setTimeLeft] = useState(TIMER_SETTINGS[mode])
   const [isActive, setIsActive] = useState(false)
   const [sessions, setSessions] = useState(0)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const startTimeRef = useRef<number>(0)
 
+  // Reset timer when mode changes
   useEffect(() => {
     setTimeLeft(TIMER_SETTINGS[mode])
     setIsActive(false)
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
   }, [mode])
 
+  // Handle timer countdown
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
+    if (isActive) {
+      startTimeRef.current = Date.now() - (TIMER_SETTINGS[mode] - timeLeft) * 1000
 
-    if (isActive && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft(timeLeft - 1)
+      intervalRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000)
+        const newTimeLeft = Math.max(0, TIMER_SETTINGS[mode] - elapsed)
+
+        setTimeLeft(newTimeLeft)
+
+        if (newTimeLeft === 0) {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current)
+            intervalRef.current = null
+          }
+          setIsActive(false)
+
+          // Play notification sound
+          try {
+            const audio = new Audio("/notification.mp3")
+            audio.play().catch((e) => console.log("Audio play failed:", e))
+          } catch (error) {
+            console.error("Could not play notification sound", error)
+          }
+
+          if (mode === "focus") {
+            setSessions((prev) => prev + 1)
+            setMode(sessions % 4 === 3 ? "longBreak" : "shortBreak")
+          } else {
+            setMode("focus")
+          }
+        }
       }, 1000)
-    } else if (isActive && timeLeft === 0) {
-      setIsActive(false)
-      if (mode === "focus") {
-        setSessions(sessions + 1)
-        setMode(sessions % 4 === 3 ? "longBreak" : "shortBreak")
-      } else {
-        setMode("focus")
-      }
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
 
     return () => {
-      if (interval) clearInterval(interval)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
     }
-  }, [isActive, timeLeft, mode, sessions])
+  }, [isActive, mode, sessions])
 
   const toggleTimer = () => {
     setIsActive(!isActive)
   }
 
   const resetTimer = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
     setIsActive(false)
     setTimeLeft(TIMER_SETTINGS[mode])
   }
@@ -77,16 +113,31 @@ export function PomodoroTimer() {
         </TabsList>
       </Tabs>
 
-      <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
-        <CardContent className="pt-6">
+      <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+        <CardHeader>
+          <CardTitle className="text-center">Pomodoro Timer</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-2">
           <div className="flex flex-col items-center justify-center space-y-6">
-            <div className="text-6xl font-bold">{formatTime(timeLeft)}</div>
+            <div className="text-6xl font-bold tabular-nums">{formatTime(timeLeft)}</div>
             <Progress value={calculateProgress()} className="h-2 w-full" />
             <div className="flex items-center gap-4">
-              <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={toggleTimer}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-full"
+                onClick={toggleTimer}
+                aria-label={isActive ? "Pause timer" : "Start timer"}
+              >
                 {isActive ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
               </Button>
-              <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={resetTimer}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-full"
+                onClick={resetTimer}
+                aria-label="Reset timer"
+              >
                 <RotateCcw className="h-5 w-5" />
               </Button>
             </div>

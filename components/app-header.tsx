@@ -11,7 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useSidebar } from "@/components/sidebar-provider"
 import { ModeToggle } from "@/components/mode-toggle"
 import { PWAInstaller } from "@/components/pwa-installer"
@@ -31,17 +30,12 @@ export function AppHeader() {
         <Menu className="h-5 w-5" />
       </Button>
 
-      <div className="flex items-center gap-2 md:hidden">
+      <div className="flex items-center gap-2">
         <Shield className="h-6 w-6 text-primary" />
         <span className="font-bold text-lg text-primary">USAFA Prep</span>
       </div>
 
-      <div className="hidden md:flex items-center gap-2 mr-4">
-        <Shield className="h-6 w-6 text-primary" />
-        <span className="font-bold text-lg text-primary">USAFA Prep</span>
-      </div>
-
-      <div className="relative flex-1 max-w-md mx-auto md:mx-0">
+      <div className="relative flex-1 max-w-md mx-auto md:mx-0 md:ml-6">
         <div className="relative w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input type="search" placeholder="Search..." className="w-full pl-8 pr-4 h-10" />
@@ -57,29 +51,15 @@ export function AppHeader() {
               <Bell className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-[300px] bg-popover border border-border">
             <DropdownMenuLabel>Notifications</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>No new notifications</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative" aria-label="User menu">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src="/vibrant-street-market.png" alt="User" />
-                <AvatarFallback>US</AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuItem>Support</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>Logout</DropdownMenuItem>
+            <DropdownMenuItem>
+              <div className="flex flex-col">
+                <span className="font-medium">No new notifications</span>
+                <span className="text-xs text-muted-foreground">Check back later for updates</span>
+              </div>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

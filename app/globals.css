@@ -29,6 +29,12 @@
     --ring: 220 100% 31.4%;
 
     --radius: 0.5rem;
+
+    /* Card and popover backgrounds */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
   }
 
   .dark {
@@ -36,7 +42,7 @@
     --foreground: 210 40% 98%;
 
     /* USAFA Blue as primary (slightly lighter for dark mode) */
-    --primary: 220 100% 40%;
+    --primary: 220 100% 50%;
     --primary-foreground: 210 40% 98%;
 
     /* USAFA Silver as secondary */
@@ -55,6 +61,12 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+
+    /* Card and popover backgrounds */
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
   }
 }
 
@@ -91,4 +103,15 @@
   html {
     font-size: 14px;
   }
+}
+
+/* Transitions for theme changes */
+.theme-transition {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Fix for dropdown menus */
+.dropdown-menu-content {
+  background-color: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
 }

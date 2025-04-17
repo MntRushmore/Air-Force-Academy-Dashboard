@@ -90,33 +90,15 @@ export function AppSidebar() {
 
   return (
     <>
+      {/* Desktop Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-16 z-20 h-[calc(100vh-4rem)] w-64 border-r bg-background transition-all duration-300 ease-in-out",
-          open ? "translate-x-0" : "-translate-x-full md:translate-x-0 md:w-20",
+          "fixed left-0 top-16 z-20 h-[calc(100vh-4rem)] border-r bg-background transition-all duration-300 ease-in-out",
+          open ? "w-64" : "w-20",
         )}
       >
-        <div className="flex h-16 items-center justify-between px-4 border-b md:hidden">
-          <Link href="/" className="flex items-center gap-2">
-            {open ? (
-              <div className="flex items-center gap-2">
-                <div className="rounded-md bg-primary p-1">
-                  <Shield className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <span className="text-lg font-bold">USAFA Prep</span>
-              </div>
-            ) : (
-              <div className="rounded-md bg-primary p-1 mx-auto">
-                <Shield className="h-6 w-6 text-primary-foreground" />
-              </div>
-            )}
-          </Link>
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(!open)}>
-            {open ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </Button>
-        </div>
-        <ScrollArea className="h-[calc(100vh-8rem)] md:h-[calc(100vh-4rem)] pb-10">
-          <div className="px-3 py-2">
+        <ScrollArea className="h-[calc(100vh-8rem)]">
+          <div className="px-3 py-4">
             <div className="space-y-1">
               {navItems.map((item) => (
                 <Link
@@ -135,8 +117,14 @@ export function AppSidebar() {
             </div>
           </div>
         </ScrollArea>
-        <div className="absolute bottom-4 left-0 right-0 px-3 hidden md:block">
-          <Button variant="ghost" size="icon" className="w-full flex justify-center" onClick={() => setOpen(!open)}>
+        <div className="absolute bottom-4 left-0 right-0 px-3">
+          <Button
+            variant="outline"
+            size="icon"
+            className="w-full flex justify-center"
+            onClick={() => setOpen(!open)}
+            aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
+          >
             {open ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -156,8 +144,8 @@ export function AppSidebar() {
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <ScrollArea className="h-[calc(100vh-4rem)] pb-10">
-            <div className="px-3 py-2">
+          <ScrollArea className="h-[calc(100vh-4rem)]">
+            <div className="px-3 py-4">
               <div className="space-y-1">
                 {navItems.map((item) => (
                   <Link
