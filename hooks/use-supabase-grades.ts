@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { fetchData, insertData, updateData, deleteData, getClientId } from "@/lib/supabase-client"
+import { getClientId } from "@/lib/supabase-client"
 import type { Database } from "@/lib/database.types"
 
 type Grade = Database["public"]["Tables"]["grades"]["Row"]
@@ -13,59 +13,67 @@ type UpdateGrade = Partial<
   Omit<Database["public"]["Tables"]["grades"]["Update"], "id" | "client_id" | "created_at" | "updated_at">
 >
 
-export function useSupabaseGrades(courseId?: string) {
+export function useSupabaseGrades() {
   const [grades, setGrades] = useState<Grade[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [initialized, setInitialized] = useState(false)
   const clientId = getClientId()
 
-  // Fetch grades, optionally filtered by course ID
-  const fetchGrades = useCallback(async () => {
-    if (clientId === "server-side") return
+  // Fetch all grades using the API
+  const fetchGrades = useCallback(
+    async (courseId?: string) => {
+      if (clientId === "server-side") return
 
-    try {
-      setLoading(true)
-      setError(null)
+      try {
+        setLoading(true)
+        setError(null)
 
-      const filters: Record<string, any> = {}
-      if (courseId) {
-        filters.course_id = courseId
+        const url = courseId ? `/api/grades?courseId=${courseId}` : "/api/grades"
+        const response = await fetch(url, {
+          headers: {
+            "x-client-id": clientId,
+          },
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to fetch grades")
+        }
+
+        const { data } = await response.json()
+        setGrades(data || [])
+        setInitialized(true)
+      } catch (err) {
+        console.error("Error fetching grades:", err)
+        setError(err instanceof Error ? err : new Error(String(err)))
+      } finally {
+        setLoading(false)
       }
+    },
+    [clientId],
+  )
 
-      const data = await fetchData<Grade>("grades", {
-        filters,
-        order: { column: "date", ascending: false },
-      })
-
-      setGrades(data)
-      setInitialized(true)
-    } catch (err) {
-      console.error("Error fetching grades:", err)
-      setError(err instanceof Error ? err : new Error(String(err)))
-    } finally {
-      setLoading(false)
-    }
-  }, [courseId, clientId])
-
-  // Add a new grade
+  // Add a new grade using the API
   const addGrade = async (grade: InsertGrade): Promise<Grade | null> => {
     try {
       setError(null)
 
-      // Ensure all required fields are present
-      const gradeToAdd: InsertGrade = {
-        course_id: grade.course_id,
-        title: grade.title,
-        type: grade.type || "exam",
-        score: grade.score,
-        max_score: grade.max_score,
-        weight: grade.weight || 10,
-        date: grade.date || new Date().toISOString().split("T")[0],
-        notes: grade.notes || "",
+      const response = await fetch("/api/grades", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-client-id": clientId,
+        },
+        body: JSON.stringify(grade),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to add grade")
       }
 
-      const newGrade = await insertData<Grade>("grades", gradeToAdd)
+      const { data: newGrade } = await response.json()
 
       if (newGrade) {
         setGrades((prev) => [newGrade, ...prev])
@@ -79,41 +87,25 @@ export function useSupabaseGrades(courseId?: string) {
     }
   }
 
-  // Update an existing grade
-  const updateGrade = async (id: string, updates: UpdateGrade): Promise<boolean> => {
-    try {
-      setError(null)
-
-      const success = await updateData<Grade>("grades", id, updates)
-
-      if (success) {
-        setGrades((prev) =>
-          prev.map((grade) =>
-            grade.id === id ? { ...grade, ...updates, updated_at: new Date().toISOString() } : grade,
-          ),
-        )
-      }
-
-      return success
-    } catch (err) {
-      console.error("Error updating grade:", err)
-      setError(err instanceof Error ? err : new Error(String(err)))
-      return false
-    }
-  }
-
-  // Delete a grade
+  // Delete a grade using the API
   const deleteGrade = async (id: string): Promise<boolean> => {
     try {
       setError(null)
 
-      const success = await deleteData("grades", id)
+      const response = await fetch(`/api/grades?id=${id}`, {
+        method: "DELETE",
+        headers: {
+          "x-client-id": clientId,
+        },
+      })
 
-      if (success) {
-        setGrades((prev) => prev.filter((grade) => grade.id !== id))
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to delete grade")
       }
 
-      return success
+      setGrades((prev) => prev.filter((grade) => grade.id !== id))
+      return true
     } catch (err) {
       console.error("Error deleting grade:", err)
       setError(err instanceof Error ? err : new Error(String(err)))
@@ -121,12 +113,12 @@ export function useSupabaseGrades(courseId?: string) {
     }
   }
 
-  // Fetch grades on component mount or when courseId changes
+  // Fetch grades on component mount
   useEffect(() => {
-    if (clientId !== "server-side") {
+    if (!initialized && clientId !== "server-side") {
       fetchGrades()
     }
-  }, [courseId, clientId, fetchGrades])
+  }, [fetchGrades, initialized, clientId])
 
   return {
     grades,
@@ -134,7 +126,6 @@ export function useSupabaseGrades(courseId?: string) {
     error,
     fetchGrades,
     addGrade,
-    updateGrade,
     deleteGrade,
     initialized,
   }

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Clock, AlertCircle } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { IntegrationNotificationForm } from "@/components/integration-notification-form"
+import Image from "next/image"
 
 export function GoogleClassroomIntegration() {
   return (
@@ -41,7 +42,9 @@ export function GoogleClassroomIntegration() {
       <CardContent className="space-y-4">
         <div className="text-center py-6 px-4">
           <div className="relative mx-auto mb-6 h-24 w-24 opacity-80">
-            <img src="/digital-classroom-icon.png" alt="Google Classroom" className="h-full w-full object-contain" />
+            <div className="h-full w-full relative">
+              <Image src="/digital-classroom-icon.png" alt="Google Classroom" fill className="object-contain" />
+            </div>
             <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] flex items-center justify-center rounded-full">
               <Clock className="h-10 w-10 text-muted-foreground" />
             </div>

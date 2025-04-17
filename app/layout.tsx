@@ -31,6 +31,20 @@ export default function RootLayout({
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="theme-color" content="#0033a0" />
+
+        {/* Add fallback for resource loading errors */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+            window.addEventListener('error', function(e) {
+              if (e.target && (e.target.tagName === 'IMG' || e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
+                console.warn('Resource failed to load:', e.target.src || e.target.href);
+                e.preventDefault();
+              }
+            }, true);
+          `,
+          }}
+        />
       </head>
       <body className={inter.className}>
         <ClientLayout>{children}</ClientLayout>
