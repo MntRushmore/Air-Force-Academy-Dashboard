@@ -1,75 +1,171 @@
 "use client"
 
-import type React from "react"
-
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  BarChart,
   BookOpen,
   Calendar,
-  Clock,
-  FileText,
-  GraduationCap,
-  Home,
+  CheckCircle2,
+  Dumbbell,
+  Flame,
   LayoutDashboard,
+  Menu,
+  MessageSquare,
   Settings,
   Target,
   User,
 } from "lucide-react"
-
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { useSidebar } from "@/components/sidebar-provider"
+
+const sidebarItems = [
+  {
+    href: "/",
+    icon: LayoutDashboard,
+    label: "Dashboard",
+  },
+  {
+    href: "/courses",
+    icon: BookOpen,
+    label: "Courses",
+  },
+  {
+    href: "/fitness",
+    icon: Dumbbell,
+    label: "Fitness",
+  },
+  {
+    href: "/goals",
+    icon: Target,
+    label: "Goals",
+  },
+  {
+    href: "/timeline",
+    icon: Flame,
+    label: "Timeline",
+  },
+  {
+    href: "/study",
+    icon: BookOpen,
+    label: "Study",
+  },
+  {
+    href: "/mentorship",
+    icon: User,
+    label: "Mentorship",
+  },
+  {
+    href: "/journal",
+    icon: MessageSquare,
+    label: "Journal",
+  },
+  {
+    href: "/schedule",
+    icon: Calendar,
+    label: "Schedule",
+  },
+  {
+    href: "/report-card",
+    icon: CheckCircle2,
+    label: "Report Card",
+  },
+  {
+    href: "/settings",
+    icon: Settings,
+    label: "Settings",
+  },
+]
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const { open, setOpen, mobileOpen, setMobileOpen } = useSidebar()
 
   return (
-    <div className="group flex h-screen w-16 flex-col items-center border-r bg-background py-3 transition-all duration-300 hover:w-64 md:w-64">
-      <div className="flex h-16 w-full items-center justify-center px-4">
-        <GraduationCap className="h-8 w-8 text-primary" />
-        <span className="ml-2 hidden text-xl font-bold group-hover:inline-block md:inline-block">USAFA Prep</span>
-      </div>
-      <div className="flex flex-1 flex-col gap-1 px-2">
-        <NavItem href="/" icon={Home} label="Dashboard" isActive={pathname === "/"} />
-        <NavItem href="/courses" icon={BookOpen} label="Courses" isActive={pathname === "/courses"} />
-        <NavItem href="/grades" icon={FileText} label="Grades" isActive={pathname === "/grades"} />
-        <NavItem href="/schedule" icon={Calendar} label="Schedule" isActive={pathname === "/schedule"} />
-        <NavItem href="/pomodoro" icon={Clock} label="Pomodoro" isActive={pathname === "/pomodoro"} />
-        <NavItem href="/study" icon={LayoutDashboard} label="Study" isActive={pathname === "/study"} />
-        <NavItem href="/progress" icon={BarChart} label="Progress" isActive={pathname === "/progress"} />
-        <NavItem href="/goals" icon={Target} label="Goals" isActive={pathname === "/goals"} />
-        <NavItem href="/mentorship" icon={User} label="Mentorship" isActive={pathname === "/mentorship"} />
-        <NavItem href="/journal" icon={FileText} label="Journal" isActive={pathname === "/journal"} />
-      </div>
-      <div className="mt-auto px-2 pb-4">
-        <NavItem href="/settings" icon={Settings} label="Settings" isActive={pathname === "/settings"} />
-      </div>
-    </div>
-  )
-}
+    <>
+      <aside
+        className={`fixed top-0 z-40 h-full bg-background border-r shadow-sm transition-transform duration-300 ${
+          open ? "w-64" : "w-20"
+        } ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
+      >
+        <ScrollArea className="py-4 flex flex-col h-full">
+          <div className="px-3 py-2 text-center">
+            <Link href="/" className="font-bold text-lg">
+              USAFA Prep
+            </Link>
+          </div>
+          <Separator />
+          <div className="flex-1">
+            <ul className="space-y-1">
+              {sidebarItems.map((item) => {
+                const isActive =
+                  (pathname === "/" && item.href === "/") || (pathname !== "/" && pathname?.startsWith(item.href))
 
-interface NavItemProps {
-  href: string
-  icon: React.ElementType
-  label: string
-  isActive?: boolean
-}
+                return (
+                  <li key={item.href}>
+                    <Button
+                      variant="ghost"
+                      className={`w-full justify-start ${
+                        isActive ? "bg-accent" : ""
+                      } ${open ? "pl-8" : "pl-2 justify-center"}`}
+                      asChild
+                    >
+                      <Link href={item.href} onClick={() => setMobileOpen(false)}>
+                        <div className="flex items-center">
+                          <item.icon className="h-4 w-4 mr-2" />
+                          {open && <span>{item.label}</span>}
+                        </div>
+                      </Link>
+                    </Button>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        </ScrollArea>
+      </aside>
 
-function NavItem({ href, icon: Icon, label, isActive }: NavItemProps) {
-  return (
-    <Button
-      asChild
-      variant="ghost"
-      className={cn(
-        "w-full justify-start",
-        isActive ? "bg-muted hover:bg-muted" : "hover:bg-transparent hover:underline",
-      )}
-    >
-      <Link href={href}>
-        <Icon className="h-5 w-5" />
-        <span className="ml-2 hidden group-hover:inline-block md:inline-block">{label}</span>
-      </Link>
-    </Button>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon" className="mr-2 md:hidden">
+            <Menu className="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-64 p-0">
+          <SheetHeader className="text-left px-4 pt-4">
+            <SheetTitle>USAFA Prep</SheetTitle>
+          </SheetHeader>
+          <ScrollArea className="py-4">
+            <div className="flex-1">
+              <ul className="space-y-1">
+                {sidebarItems.map((item) => {
+                  const isActive =
+                    (pathname === "/" && item.href === "/") || (pathname !== "/" && pathname?.startsWith(item.href))
+
+                  return (
+                    <li key={item.href}>
+                      <Button
+                        variant="ghost"
+                        className={`w-full justify-start ${isActive ? "bg-accent" : ""} pl-8`}
+                        asChild
+                      >
+                        <Link href={item.href} onClick={() => setMobileOpen(false)}>
+                          <div className="flex items-center">
+                            <item.icon className="h-4 w-4 mr-2" />
+                            <span>{item.label}</span>
+                          </div>
+                        </Link>
+                      </Button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
+    </>
   )
 }
