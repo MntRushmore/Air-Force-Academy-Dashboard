@@ -15,6 +15,7 @@ import {
   Target,
   User,
   BarChart,
+  TrendingUp,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -77,6 +78,11 @@ const sidebarItems = [
     href: "/grade-comparison",
     icon: BarChart,
     label: "Grade Analysis",
+  },
+  {
+    href: "/grade-prediction",
+    icon: TrendingUp,
+    label: "Grade Prediction",
   },
   {
     href: "/settings",

@@ -1,143 +1,57 @@
-"use server"
+"use client"
 
-import { revalidatePath } from "next/cache"
-import ical from "ical"
-import { v4 as uuidv4 } from "uuid"
-import { getSetting, setSetting } from "./db"
+import { getSetting, setSetting } from "@/lib/db"
+import { z } from "zod"
 
+// Define the schema for calendar settings
+const calendarSettingsSchema = z.object({
+  dayStartHour: z.number().min(0).max(23).default(7),
+  dayEndHour: z.number().min(0).max(23).default(22),
+  hidePastEvents: z.boolean().default(false),
+  defaultView: z.enum(["day", "week", "agenda"]).default("day"),
+})
+
+export type CalendarSettings = z.infer<typeof calendarSettingsSchema>
+
+// Define the schema for calendar events
 export interface CalendarEvent {
   id: string
   title: string
-  description: string
-  location: string
   start: string
   end: string
   allDay: boolean
-  categories: string[]
+  location?: string
+  description?: string
   url?: string
+  categories?: string[]
 }
 
-export async function fetchCalendarEvents(): Promise<{ events: CalendarEvent[]; error?: string }> {
-  try {
-    // Get the calendar URL from settings
-    const calendarUrl = await getSetting("calendarUrl")
+// Browser check utility
+const isBrowser = typeof window !== "undefined"
 
-    if (!calendarUrl) {
-      return { events: [], error: "No calendar URL configured" }
-    }
-
-    // Fetch the iCalendar data
-    const response = await fetch(calendarUrl, {
-      cache: "no-store", // Ensure we get fresh data
-      headers: {
-        Accept: "text/calendar",
-      },
-    })
-
-    if (!response.ok) {
-      console.error(`Failed to fetch calendar: ${response.status} ${response.statusText}`)
-      return {
-        events: [],
-        error: `Failed to fetch calendar: ${response.status} ${response.statusText}`,
-      }
-    }
-
-    // Parse the iCalendar data
-    const icsData = await response.text()
-    const parsedData = ical.parseICS(icsData)
-
-    // Convert to our event format
-    const events: CalendarEvent[] = []
-
-    for (const k in parsedData) {
-      if (parsedData.hasOwnProperty(k)) {
-        const event = parsedData[k]
-
-        if (event.type === "VEVENT") {
-          // Skip events without start/end times
-          if (!event.start || !event.end) continue
-
-          events.push({
-            id: event.uid || uuidv4(),
-            title: event.summary || "Untitled Event",
-            description: event.description || "",
-            location: event.location || "",
-            start: event.start.toISOString(),
-            end: event.end.toISOString(),
-            allDay: event.start.dateOnly === true,
-            categories: Array.isArray(event.categories) ? event.categories : event.categories ? [event.categories] : [],
-            url: event.url || undefined,
-          })
-        }
-      }
-    }
-
-    return { events }
-  } catch (error) {
-    console.error("Error fetching calendar events:", error)
+// Get calendar settings
+export async function getCalendarSettings(): Promise<CalendarSettings> {
+  if (!isBrowser) {
     return {
-      events: [],
-      error: error instanceof Error ? error.message : "Unknown error fetching calendar events",
+      dayStartHour: 7,
+      dayEndHour: 22,
+      hidePastEvents: false,
+      defaultView: "day",
     }
   }
-}
 
-export async function saveCalendarUrl(url: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    // Validate the URL by trying to fetch it
-    const response = await fetch(url, {
-      method: "HEAD",
-      headers: {
-        Accept: "text/calendar",
-      },
-    })
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: `Failed to validate calendar URL: ${response.status} ${response.statusText}`,
-      }
-    }
-
-    // Save the URL to settings
-    await setSetting("calendarUrl", url)
-    revalidatePath("/schedule")
-
-    return { success: true }
-  } catch (error) {
-    console.error("Error saving calendar URL:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error saving calendar URL",
-    }
-  }
-}
-
-export async function saveCalendarSettings(settings: any): Promise<{ success: boolean; error?: string }> {
-  try {
-    await setSetting("calendarSettings", settings)
-    revalidatePath("/schedule")
-    return { success: true }
-  } catch (error) {
-    console.error("Error saving calendar settings:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error saving settings",
-    }
-  }
-}
-
-export async function getCalendarSettings(): Promise<any> {
   try {
     const settings = await getSetting("calendarSettings")
-    return (
-      settings || {
+    if (!settings) {
+      return {
         dayStartHour: 7,
         dayEndHour: 22,
         hidePastEvents: false,
         defaultView: "day",
       }
-    )
+    }
+
+    return calendarSettingsSchema.parse(settings)
   } catch (error) {
     console.error("Error getting calendar settings:", error)
     return {
@@ -146,5 +60,74 @@ export async function getCalendarSettings(): Promise<any> {
       hidePastEvents: false,
       defaultView: "day",
     }
+  }
+}
+
+// Save calendar settings
+export async function saveCalendarSettings(settings: CalendarSettings): Promise<{ success: boolean; error?: string }> {
+  if (!isBrowser) {
+    return { success: false, error: "Cannot save settings on the server" }
+  }
+
+  try {
+    const validatedSettings = calendarSettingsSchema.parse(settings)
+    await setSetting("calendarSettings", validatedSettings)
+    return { success: true }
+  } catch (error) {
+    console.error("Error saving calendar settings:", error)
+    return { success: false, error: "Failed to save calendar settings" }
+  }
+}
+
+// Save calendar URL
+export async function saveCalendarUrl(url: string): Promise<{ success: boolean; error?: string }> {
+  if (!isBrowser) {
+    return { success: false, error: "Cannot save URL on the server" }
+  }
+
+  try {
+    if (!url) {
+      return { success: false, error: "URL is required" }
+    }
+
+    // Basic URL validation
+    try {
+      new URL(url)
+    } catch (e) {
+      return { success: false, error: "Invalid URL format" }
+    }
+
+    await setSetting("calendarUrl", url)
+    return { success: true }
+  } catch (error) {
+    console.error("Error saving calendar URL:", error)
+    return { success: false, error: "Failed to save calendar URL" }
+  }
+}
+
+// Fetch calendar events
+export async function fetchCalendarEvents(): Promise<{ events: CalendarEvent[]; error?: string }> {
+  if (!isBrowser) {
+    return { events: [], error: "Cannot fetch events on the server" }
+  }
+
+  try {
+    const url = await getSetting("calendarUrl")
+    if (!url) {
+      return { events: [], error: "No calendar URL configured" }
+    }
+
+    // Fetch the iCalendar data
+    const response = await fetch(`/api/calendar?url=${encodeURIComponent(url)}`)
+    if (!response.ok) {
+      const errorData = await response.json()
+      return { events: [], error: errorData.error || "Failed to fetch calendar data" }
+    }
+
+    const data = await response.json()
+    return { events: data.events }
+  } catch (error) {
+    console.error("Error fetching calendar events:", error)
+    return { events: [], error: "Failed to fetch calendar events" }
   }
 }
