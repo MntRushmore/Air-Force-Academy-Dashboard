@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ChevronLeft, ChevronRight, Calendar, Settings, RefreshCw } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calendar, Settings, RefreshCw, AlertCircle } from "lucide-react"
 import {
   format,
   addDays,
@@ -18,24 +18,22 @@ import {
   isToday,
   parseISO,
   isSameDay,
+  isBefore,
 } from "date-fns"
-import { getSetting, setSetting } from "@/lib/db"
+import { getSetting } from "@/lib/db"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-// Define the CalendarEvent interface
-interface CalendarEvent {
-  id: string
-  title: string
-  description: string
-  location: string
-  start: Date
-  end: Date
-  allDay: boolean
-  categories: string[]
-  url?: string
-}
+import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  fetchCalendarEvents,
+  saveCalendarUrl,
+  saveCalendarSettings,
+  getCalendarSettings,
+  type CalendarEvent,
+} from "@/lib/calendar-actions"
+import { toast } from "@/components/ui/use-toast"
 
 export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -44,35 +42,31 @@ export default function SchedulePage() {
   const [error, setError] = useState<string | null>(null)
   const [calendarUrl, setCalendarUrl] = useState("")
   const [showSettings, setShowSettings] = useState(false)
-  const [dayStartHour, setDayStartHour] = useState(7)
-  const [dayEndHour, setDayEndHour] = useState(22)
-  const [hidePastEvents, setHidePastEvents] = useState(false)
+  const [settings, setSettings] = useState({
+    dayStartHour: 7,
+    dayEndHour: 22,
+    hidePastEvents: false,
+    defaultView: "day",
+  })
   const [activeView, setActiveView] = useState("day")
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   // Load settings and calendar data on component mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
         const savedUrl = (await getSetting("calendarUrl")) || ""
-        const savedDayStart = (await getSetting("dayStartHour")) || 7
-        const savedDayEnd = (await getSetting("dayEndHour")) || 22
-        const savedHidePast = (await getSetting("hidePastEvents")) || false
-        const savedView = (await getSetting("defaultView")) || "day"
+        const savedSettings = await getCalendarSettings()
 
         setCalendarUrl(savedUrl)
-        setDayStartHour(savedDayStart)
-        setDayEndHour(savedDayEnd)
-        setHidePastEvents(savedHidePast)
-        setActiveView(savedView)
+        setSettings(savedSettings)
+        setActiveView(savedSettings.defaultView)
 
-        if (savedUrl) {
-          fetchCalendarData(savedUrl)
-        } else {
-          setLoading(false)
-        }
+        await loadCalendarData()
       } catch (err) {
         console.error("Error loading settings:", err)
+        setError("Failed to load settings. Please try again.")
         setLoading(false)
       }
     }
@@ -80,44 +74,93 @@ export default function SchedulePage() {
     loadSettings()
   }, [])
 
-  // Function to fetch and parse calendar data
-  const fetchCalendarData = async (url: string) => {
+  const loadCalendarData = async () => {
     setLoading(true)
     setError(null)
 
     try {
-      // In a real implementation, this would be a server action
-      // For now, we'll simulate some calendar data
-      setTimeout(() => {
-        const mockEvents = generateMockEvents(currentDate, 20)
-        setEvents(mockEvents)
-        setLoading(false)
-      }, 1000)
+      const { events, error } = await fetchCalendarEvents()
+
+      if (error) {
+        setError(error)
+      } else {
+        setEvents(events)
+      }
     } catch (err) {
       console.error("Error fetching calendar:", err)
       setError("Failed to fetch calendar data. Please check the URL and try again.")
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
+  // Save calendar URL
+  const handleSaveUrl = async () => {
+    try {
+      setLoading(true)
+      const { success, error } = await saveCalendarUrl(calendarUrl)
+
+      if (!success) {
+        toast({
+          title: "Error",
+          description: error || "Failed to save calendar URL",
+          variant: "destructive",
+        })
+        setError(error || "Failed to save calendar URL")
+      } else {
+        toast({
+          title: "Success",
+          description: "Calendar URL saved successfully",
+        })
+        setShowSettings(false)
+        await loadCalendarData()
+      }
+    } catch (err) {
+      console.error("Error saving URL:", err)
+      toast({
+        title: "Error",
+        description: "Failed to save calendar URL",
+        variant: "destructive",
+      })
+    } finally {
       setLoading(false)
     }
   }
 
-  // Save calendar URL and settings
-  const saveCalendarSettings = async () => {
+  // Save calendar settings
+  const handleSaveSettings = async () => {
     try {
-      await setSetting("calendarUrl", calendarUrl)
-      await setSetting("dayStartHour", dayStartHour)
-      await setSetting("dayEndHour", dayEndHour)
-      await setSetting("hidePastEvents", hidePastEvents)
-      await setSetting("defaultView", activeView)
+      const { success, error } = await saveCalendarSettings(settings)
 
-      if (calendarUrl) {
-        fetchCalendarData(calendarUrl)
+      if (!success) {
+        toast({
+          title: "Error",
+          description: error || "Failed to save settings",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Success",
+          description: "Settings saved successfully",
+        })
+        setShowSettings(false)
+        await loadCalendarData()
       }
-
-      setShowSettings(false)
     } catch (err) {
       console.error("Error saving settings:", err)
-      setError("Failed to save settings. Please try again.")
+      toast({
+        title: "Error",
+        description: "Failed to save settings",
+        variant: "destructive",
+      })
     }
+  }
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await loadCalendarData()
   }
 
   // Navigation functions
@@ -144,14 +187,20 @@ export default function SchedulePage() {
     let filteredEvents = [...events]
 
     // Apply hide past events filter if enabled
-    if (hidePastEvents) {
+    if (settings.hidePastEvents) {
       const now = new Date()
-      filteredEvents = filteredEvents.filter((event) => event.end > now)
+      filteredEvents = filteredEvents.filter((event) => {
+        const endDate = parseISO(event.end)
+        return isBefore(now, endDate)
+      })
     }
 
     // Filter for day view
     if (activeView === "day") {
-      return filteredEvents.filter((event) => isSameDay(event.start, currentDate))
+      return filteredEvents.filter((event) => {
+        const eventDate = parseISO(event.start)
+        return isSameDay(eventDate, currentDate)
+      })
     }
 
     // Filter for week view
@@ -159,17 +208,25 @@ export default function SchedulePage() {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 })
       const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 })
 
-      return filteredEvents.filter((event) => event.start >= weekStart && event.start <= weekEnd)
+      return filteredEvents.filter((event) => {
+        const eventDate = parseISO(event.start)
+        return (
+          (eventDate >= weekStart && eventDate <= weekEnd) ||
+          (parseISO(event.end) >= weekStart && parseISO(event.end) <= weekEnd)
+        )
+      })
     }
 
     // For agenda view, return all events sorted by date
-    return filteredEvents.sort((a, b) => a.start.getTime() - b.start.getTime())
+    return filteredEvents.sort((a, b) => {
+      return parseISO(a.start).getTime() - parseISO(b.start).getTime()
+    })
   }
 
   // Generate time slots for day view
   const getTimeSlots = () => {
     const slots = []
-    for (let hour = dayStartHour; hour <= dayEndHour; hour++) {
+    for (let hour = settings.dayStartHour; hour <= settings.dayEndHour; hour++) {
       slots.push(hour)
     }
     return slots
@@ -188,7 +245,7 @@ export default function SchedulePage() {
     const grouped: { [key: string]: CalendarEvent[] } = {}
 
     filteredEvents.forEach((event) => {
-      const dateKey = format(event.start, "yyyy-MM-dd")
+      const dateKey = format(parseISO(event.start), "yyyy-MM-dd")
       if (!grouped[dateKey]) {
         grouped[dateKey] = []
       }
@@ -204,21 +261,38 @@ export default function SchedulePage() {
   }
 
   // Render event card
-  const renderEventCard = (event: CalendarEvent) => (
-    <div
-      key={event.id}
-      className="p-2 mb-2 rounded-md bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors"
-      onClick={() => setSelectedEvent(event)}
-    >
-      <div className="flex justify-between items-start">
-        <div className="font-medium">{event.title}</div>
-        <div className="text-xs text-muted-foreground">
-          {format(event.start, "h:mm a")} - {format(event.end, "h:mm a")}
+  const renderEventCard = (event: CalendarEvent) => {
+    const startDate = parseISO(event.start)
+    const endDate = parseISO(event.end)
+    const isPast = isBefore(endDate, new Date())
+
+    return (
+      <div
+        key={event.id}
+        className={`p-2 mb-2 rounded-md cursor-pointer transition-colors ${
+          isPast ? "bg-muted/50" : "bg-primary/10 hover:bg-primary/20"
+        }`}
+        onClick={() => setSelectedEvent(event)}
+      >
+        <div className="flex justify-between items-start">
+          <div className="font-medium">{event.title}</div>
+          <div className="text-xs text-muted-foreground">
+            {format(startDate, "h:mm a")} - {format(endDate, "h:mm a")}
+          </div>
         </div>
+        {event.location && <div className="text-xs text-muted-foreground mt-1">📍 {event.location}</div>}
+        {event.categories && event.categories.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {event.categories.map((category) => (
+              <Badge key={category} variant="outline" className="text-xs">
+                {category}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
-      {event.location && <div className="text-xs text-muted-foreground mt-1">📍 {event.location}</div>}
-    </div>
-  )
+    )
+  }
 
   return (
     <div className="container mx-auto py-4">
@@ -232,10 +306,10 @@ export default function SchedulePage() {
           <Button variant="outline" size="sm" onClick={goToToday}>
             Today
           </Button>
-          <Button variant="outline" size="icon" size="sm" onClick={goToPrevious}>
+          <Button variant="outline" size="icon" onClick={goToPrevious}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" size="sm" onClick={goToNext}>
+          <Button variant="outline" size="icon" onClick={goToNext}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -243,6 +317,7 @@ export default function SchedulePage() {
 
       {error && (
         <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
@@ -273,8 +348,8 @@ export default function SchedulePage() {
                 <div className="space-y-2">
                   <Label htmlFor="day-start">Day Start Hour</Label>
                   <Select
-                    value={dayStartHour.toString()}
-                    onValueChange={(value) => setDayStartHour(Number.parseInt(value))}
+                    value={settings.dayStartHour.toString()}
+                    onValueChange={(value) => setSettings({ ...settings, dayStartHour: Number.parseInt(value) })}
                   >
                     <SelectTrigger id="day-start">
                       <SelectValue placeholder="Select start hour" />
@@ -292,8 +367,8 @@ export default function SchedulePage() {
                 <div className="space-y-2">
                   <Label htmlFor="day-end">Day End Hour</Label>
                   <Select
-                    value={dayEndHour.toString()}
-                    onValueChange={(value) => setDayEndHour(Number.parseInt(value))}
+                    value={settings.dayEndHour.toString()}
+                    onValueChange={(value) => setSettings({ ...settings, dayEndHour: Number.parseInt(value) })}
                   >
                     <SelectTrigger id="day-end">
                       <SelectValue placeholder="Select end hour" />
@@ -310,13 +385,20 @@ export default function SchedulePage() {
               </div>
 
               <div className="flex items-center space-x-2">
-                <Switch id="hide-past" checked={hidePastEvents} onCheckedChange={setHidePastEvents} />
+                <Switch
+                  id="hide-past"
+                  checked={settings.hidePastEvents}
+                  onCheckedChange={(checked) => setSettings({ ...settings, hidePastEvents: checked })}
+                />
                 <Label htmlFor="hide-past">Hide past events</Label>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="default-view">Default View</Label>
-                <Select value={activeView} onValueChange={setActiveView}>
+                <Select
+                  value={settings.defaultView}
+                  onValueChange={(value) => setSettings({ ...settings, defaultView: value })}
+                >
                   <SelectTrigger id="default-view">
                     <SelectValue placeholder="Select default view" />
                   </SelectTrigger>
@@ -332,7 +414,12 @@ export default function SchedulePage() {
                 <Button variant="outline" onClick={() => setShowSettings(false)}>
                   Cancel
                 </Button>
-                <Button onClick={saveCalendarSettings}>Save Settings</Button>
+                <Button onClick={handleSaveUrl} disabled={loading}>
+                  {loading ? "Saving..." : "Save URL"}
+                </Button>
+                <Button onClick={handleSaveSettings} disabled={loading}>
+                  {loading ? "Saving..." : "Save Settings"}
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -356,10 +443,11 @@ export default function SchedulePage() {
                       variant="ghost"
                       size="sm"
                       className="ml-2 h-6 px-2"
-                      onClick={() => fetchCalendarData(calendarUrl)}
+                      onClick={handleRefresh}
+                      disabled={refreshing}
                     >
-                      <RefreshCw className="h-3 w-3 mr-1" />
-                      Refresh
+                      <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? "animate-spin" : ""}`} />
+                      {refreshing ? "Refreshing..." : "Refresh"}
                     </Button>
                   </div>
                 ) : (
@@ -388,32 +476,37 @@ export default function SchedulePage() {
                   ) : getFilteredEvents().length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">No events scheduled for this day</div>
                   ) : (
-                    <div className="space-y-1">
-                      {getTimeSlots().map((hour) => {
-                        const hourEvents = getFilteredEvents().filter(
-                          (event) =>
-                            event.start.getHours() === hour ||
-                            (event.start.getHours() < hour && event.end.getHours() > hour),
-                        )
+                    <ScrollArea className="h-[calc(100vh-300px)]">
+                      <div className="space-y-1">
+                        {getTimeSlots().map((hour) => {
+                          const hourEvents = getFilteredEvents().filter((event) => {
+                            const eventStart = parseISO(event.start)
+                            const eventEnd = parseISO(event.end)
+                            return (
+                              eventStart.getHours() === hour ||
+                              (eventStart.getHours() < hour && eventEnd.getHours() > hour)
+                            )
+                          })
 
-                        return (
-                          <div key={hour} className="flex min-h-[60px]">
-                            <div className="w-20 text-sm text-muted-foreground pt-2 pr-4 text-right">
-                              {hour === 0
-                                ? "12 AM"
-                                : hour < 12
-                                  ? `${hour} AM`
-                                  : hour === 12
-                                    ? "12 PM"
-                                    : `${hour - 12} PM`}
+                          return (
+                            <div key={hour} className="flex min-h-[60px]">
+                              <div className="w-20 text-sm text-muted-foreground pt-2 pr-4 text-right">
+                                {hour === 0
+                                  ? "12 AM"
+                                  : hour < 12
+                                    ? `${hour} AM`
+                                    : hour === 12
+                                      ? "12 PM"
+                                      : `${hour - 12} PM`}
+                              </div>
+                              <div className="flex-1 border-t pt-2">
+                                {hourEvents.map((event) => renderEventCard(event))}
+                              </div>
                             </div>
-                            <div className="flex-1 border-t pt-2">
-                              {hourEvents.map((event) => renderEventCard(event))}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                          )
+                        })}
+                      </div>
+                    </ScrollArea>
                   )}
                 </TabsContent>
 
@@ -443,23 +536,28 @@ export default function SchedulePage() {
                         ))}
                       </div>
 
-                      <div className="grid grid-cols-7 gap-2 h-[500px]">
-                        {getWeekDays().map((day) => {
-                          const dayEvents = getFilteredEvents().filter((event) => isSameDay(event.start, day))
+                      <ScrollArea className="h-[500px]">
+                        <div className="grid grid-cols-7 gap-2">
+                          {getWeekDays().map((day) => {
+                            const dayEvents = getFilteredEvents().filter((event) => {
+                              const eventDate = parseISO(event.start)
+                              return isSameDay(eventDate, day)
+                            })
 
-                          return (
-                            <div key={day.toString()} className="border rounded-md p-2 overflow-y-auto">
-                              {dayEvents.length === 0 ? (
-                                <div className="text-center text-xs text-muted-foreground h-full flex items-center justify-center">
-                                  No events
-                                </div>
-                              ) : (
-                                <div className="space-y-1">{dayEvents.map((event) => renderEventCard(event))}</div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
+                            return (
+                              <div key={day.toString()} className="border rounded-md p-2 min-h-[500px]">
+                                {dayEvents.length === 0 ? (
+                                  <div className="text-center text-xs text-muted-foreground h-full flex items-center justify-center">
+                                    No events
+                                  </div>
+                                ) : (
+                                  <div className="space-y-1">{dayEvents.map((event) => renderEventCard(event))}</div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </ScrollArea>
                     </div>
                   )}
                 </TabsContent>
@@ -474,16 +572,18 @@ export default function SchedulePage() {
                   ) : getGroupedEvents().length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">No upcoming events</div>
                   ) : (
-                    <div className="space-y-6">
-                      {getGroupedEvents().map((group) => (
-                        <div key={group.date.toString()}>
-                          <h3 className="text-sm font-medium mb-2 sticky top-0 bg-background py-1">
-                            {isToday(group.date) ? "Today" : format(group.date, "EEEE, MMMM d, yyyy")}
-                          </h3>
-                          <div className="space-y-2">{group.events.map((event) => renderEventCard(event))}</div>
-                        </div>
-                      ))}
-                    </div>
+                    <ScrollArea className="h-[calc(100vh-300px)]">
+                      <div className="space-y-6">
+                        {getGroupedEvents().map((group) => (
+                          <div key={group.date.toString()}>
+                            <h3 className="text-sm font-medium mb-2 sticky top-0 bg-background py-1">
+                              {isToday(group.date) ? "Today" : format(group.date, "EEEE, MMMM d, yyyy")}
+                            </h3>
+                            <div className="space-y-2">{group.events.map((event) => renderEventCard(event))}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
                   )}
                 </TabsContent>
               </Tabs>
@@ -494,14 +594,16 @@ export default function SchedulePage() {
             <Card>
               <CardHeader>
                 <CardTitle>{selectedEvent.title}</CardTitle>
-                <CardDescription>{format(selectedEvent.start, "EEEE, MMMM d, yyyy")}</CardDescription>
+                <CardDescription>{format(parseISO(selectedEvent.start), "EEEE, MMMM d, yyyy")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-start">
                     <div className="w-20 flex-shrink-0 text-muted-foreground">Time:</div>
                     <div>
-                      {format(selectedEvent.start, "h:mm a")} - {format(selectedEvent.end, "h:mm a")}
+                      {format(parseISO(selectedEvent.start), "h:mm a")} -{" "}
+                      {format(parseISO(selectedEvent.end), "h:mm a")}
+                      {selectedEvent.allDay && " (All day)"}
                     </div>
                   </div>
 
@@ -515,7 +617,7 @@ export default function SchedulePage() {
                   {selectedEvent.description && (
                     <div className="flex items-start">
                       <div className="w-20 flex-shrink-0 text-muted-foreground">Details:</div>
-                      <div>{selectedEvent.description}</div>
+                      <div className="whitespace-pre-wrap">{selectedEvent.description}</div>
                     </div>
                   )}
 
@@ -524,9 +626,9 @@ export default function SchedulePage() {
                       <div className="w-20 flex-shrink-0 text-muted-foreground">Category:</div>
                       <div className="flex flex-wrap gap-1">
                         {selectedEvent.categories.map((category) => (
-                          <span key={category} className="px-2 py-1 bg-primary/10 text-xs rounded-full">
+                          <Badge key={category} variant="secondary" className="text-xs">
                             {category}
-                          </span>
+                          </Badge>
                         ))}
                       </div>
                     </div>
@@ -553,38 +655,4 @@ export default function SchedulePage() {
       )}
     </div>
   )
-}
-
-// Helper function to generate mock events for demonstration
-function generateMockEvents(baseDate: Date, count: number): CalendarEvent[] {
-  const events: CalendarEvent[] = []
-  const categories = ["Class", "Study", "Meeting", "Exam", "Physical Training", "Social"]
-  const locations = ["Fairchild Hall", "Mitchell Hall", "Sijan Hall", "Vandenberg Hall", "Arnold Hall", "Harmon Hall"]
-
-  for (let i = 0; i < count; i++) {
-    const dayOffset = Math.floor(Math.random() * 14) - 7 // -7 to +7 days
-    const date = addDays(baseDate, dayOffset)
-    date.setHours(8 + Math.floor(Math.random() * 12)) // 8 AM to 8 PM
-    date.setMinutes(Math.random() > 0.5 ? 0 : 30)
-
-    const durationHours = Math.floor(Math.random() * 3) + 1 // 1 to 3 hours
-    const end = new Date(date)
-    end.setHours(date.getHours() + durationHours)
-
-    const category = categories[Math.floor(Math.random() * categories.length)]
-
-    events.push({
-      id: `event-${i}`,
-      title: `${category} - ${i + 1}`,
-      description: `This is a sample ${category.toLowerCase()} event for demonstration purposes.`,
-      location: locations[Math.floor(Math.random() * locations.length)],
-      start: date,
-      end: end,
-      allDay: false,
-      categories: [category],
-      url: Math.random() > 0.7 ? "https://example.com/event" : undefined,
-    })
-  }
-
-  return events
 }

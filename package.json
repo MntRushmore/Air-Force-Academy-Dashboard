@@ -62,7 +62,8 @@
     "dexie-react-hooks": "latest",
     "uuid": "latest",
     "ical": "latest",
-    "idb": "latest"
+    "idb": "latest",
+    "pdfjs-dist": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
