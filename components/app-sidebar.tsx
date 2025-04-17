@@ -83,6 +83,11 @@ const sidebarItems = [
     icon: TrendingUp,
     label: "Grade Prediction",
   },
+  {
+    href: "/settings",
+    icon: Settings,
+    label: "Settings",
+  },
 ]
 
 export function AppSidebar() {
@@ -175,17 +180,6 @@ export function AppSidebar() {
                     </li>
                   )
                 })}
-
-                <li>
-                  <Button variant="ghost" className="w-full justify-start px-3 h-10" asChild>
-                    <Link href="/settings" onClick={() => setMobileOpen(false)}>
-                      <div className="flex items-center">
-                        <Settings className="h-4 w-4 mr-2" />
-                        <span>Settings</span>
-                      </div>
-                    </Link>
-                  </Button>
-                </li>
               </ul>
             </nav>
           </ScrollArea>
