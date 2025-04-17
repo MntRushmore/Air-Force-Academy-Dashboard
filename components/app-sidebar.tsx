@@ -82,6 +82,11 @@ const navItems = [
     href: "/settings",
     icon: Settings,
   },
+  {
+    title: "Schedule",
+    href: "/schedule",
+    icon: Calendar,
+  },
 ]
 
 export function AppSidebar() {
