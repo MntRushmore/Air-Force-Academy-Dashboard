@@ -21,19 +21,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DashboardSummary } from "@/components/dashboard-summary"
-import { FitnessSummary } from "@/components/fitness-summary"
 import { GPASummary } from "@/components/gpa-summary"
 
 export default function Dashboard() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-4 md:p-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">Welcome to your USAFA application dashboard</p>
       </div>
-
-      <DashboardSummary />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gradient-to-br from-[#0033a0] to-[#003db8] text-white shadow-md hover:shadow-lg transition-shadow">
@@ -87,9 +83,6 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <div>
-          <FitnessSummary />
-        </div>
         <div>
           <GPASummary />
         </div>

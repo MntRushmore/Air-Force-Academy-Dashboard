@@ -90,3 +90,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Add this to the end of the file */
+.sidebar {
+  z-index: 40;
+}
+
+@media (max-width: 768px) {
+  .sidebar-overlay {
+    z-index: 30;
+  }
+}
