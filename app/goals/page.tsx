@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
 import { Check, Flag, Plus, Target, Trash2, Dumbbell } from "lucide-react"
 
@@ -25,6 +25,11 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 
+// Add imports for fitness and application utilities
+import { calculateCFAScore } from "@/lib/fitness-utils"
+import { calculateApplicationProgress } from "@/lib/application-utils"
+import { calculateGPA } from "@/lib/grade-analysis"
+
 export default function GoalsPage() {
   const goals = useLiveQuery(() => db.goals.toArray(), []) || []
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
@@ -35,6 +40,76 @@ export default function GoalsPage() {
     progress: 0,
     completed: false,
   })
+
+  // Add additional data fetching
+  const exercises = useLiveQuery(() => db.exercises.toArray(), []) || []
+  const courses = useLiveQuery(() => db.courses.toArray(), []) || []
+  const grades = useLiveQuery(() => db.grades.toArray(), []) || []
+  const [gender, setGender] = useState<"male" | "female">("male")
+
+  // Use effect to get gender preference from settings
+  useEffect(() => {
+    const getGenderPreference = async () => {
+      const genderPref = await db.settings.where("key").equals("gender").first()
+      if (genderPref) {
+        setGender(genderPref.value)
+      }
+    }
+
+    getGenderPreference()
+  }, [])
+
+  // Calculate GPA
+  const gpa = calculateGPA(courses, grades)
+
+  // Calculate fitness score
+  const fitnessScore = calculateCFAScore(exercises, gender)
+
+  // Calculate application progress
+  const { overall: appProgress, components } = calculateApplicationProgress(goals, exercises, gender, gpa)
+
+  // Update application progress in settings when relevant data changes
+  useEffect(() => {
+    const updateApplicationProgress = async () => {
+      await db.settings.put({
+        key: "applicationProgress",
+        value: appProgress,
+        createdAt: new Date(),
+      })
+    }
+
+    updateApplicationProgress()
+  }, [appProgress])
+
+  const updateGoal = async (id: string, changes: Partial<Goal>) => {
+    if (!id) return
+    await updateItem(db.goals, id, changes)
+
+    // Update selected goal if it's the one being modified
+    if (selectedGoal && selectedGoal.id === id) {
+      setSelectedGoal({ ...selectedGoal, ...changes })
+    }
+  }
+
+  // Add a function to update fitness goals based on CFA score
+  const updateFitnessGoals = useCallback(async () => {
+    // Find fitness goals related to CFA
+    const cfaGoal = goals.find(
+      (g) =>
+        (g.category === "Fitness" && g.title.toLowerCase().includes("cfa")) ||
+        g.title.toLowerCase().includes("fitness assessment"),
+    )
+
+    if (cfaGoal && cfaGoal.id) {
+      // Update the goal progress based on fitness score
+      await updateGoal(cfaGoal.id, { progress: fitnessScore })
+    }
+  }, [fitnessScore, goals, updateGoal])
+
+  // Call the update function when fitness score changes
+  useEffect(() => {
+    updateFitnessGoals()
+  }, [fitnessScore, updateFitnessGoals])
 
   const addGoal = async () => {
     if (!newGoal.title) return
@@ -56,16 +131,6 @@ export default function GoalsPage() {
       progress: 0,
       completed: false,
     })
-  }
-
-  const updateGoal = async (id: string, changes: Partial<Goal>) => {
-    if (!id) return
-    await updateItem(db.goals, id, changes)
-
-    // Update selected goal if it's the one being modified
-    if (selectedGoal && selectedGoal.id === id) {
-      setSelectedGoal({ ...selectedGoal, ...changes })
-    }
   }
 
   const removeGoal = async (id: string) => {
@@ -735,7 +800,7 @@ export default function GoalsPage() {
                 <Flag className="h-12 w-12 text-[#0033a0] mb-4" />
                 <h3 className="text-lg font-medium">No application goals added yet</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Add application goals to track your USAFA application progress
+                  Add application goals to track your USAFA application
                 </p>
                 <Dialog>
                   <DialogTrigger asChild>

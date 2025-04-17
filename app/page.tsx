@@ -19,8 +19,63 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { db } from "@/lib/db"
+import { useLiveQuery } from "dexie-react-hooks"
+import { calculateGPA } from "@/lib/grade-analysis"
+
+// Add imports for fitness and application utilities
+import { calculateCFAScore } from "@/lib/fitness-utils"
+import { calculateApplicationProgress } from "@/lib/application-utils"
+import { useEffect, useState } from "react"
 
 export default function Dashboard() {
+  const courses = useLiveQuery(() => db.courses.toArray(), []) || []
+  const grades = useLiveQuery(() => db.grades.toArray(), []) || []
+
+  // Calculate GPA using the unified function
+  const currentGPA = calculateGPA(courses, grades)
+
+  // Calculate fitness score (placeholder for now)
+  const exercises = useLiveQuery(() => db.exercises.toArray(), []) || []
+  const goals = useLiveQuery(() => db.goals.toArray(), []) || []
+  const [gender, setGender] = useState<"male" | "female">("male")
+  const [applicationProgress, setApplicationProgress] = useState(0)
+
+  // Calculate fitness score
+  const fitnessScore = calculateCFAScore(exercises, gender)
+
+  // Use effect to get gender preference from settings
+  useEffect(() => {
+    const getGenderPreference = async () => {
+      const genderPref = await db.settings.where("key").equals("gender").first()
+      if (genderPref) {
+        setGender(genderPref.value)
+      }
+    }
+
+    getGenderPreference()
+  }, [])
+
+  // Use effect to get application progress from settings
+  useEffect(() => {
+    const getApplicationProgress = async () => {
+      const progress = await db.settings.where("key").equals("applicationProgress").first()
+      if (progress) {
+        setApplicationProgress(progress.value)
+      } else {
+        // Calculate if not found in settings
+        const { overall } = calculateApplicationProgress(goals, exercises, gender, currentGPA)
+        setApplicationProgress(overall)
+      }
+    }
+
+    getApplicationProgress()
+  }, [goals, exercises, gender, currentGPA])
+
+  // Calculate XP level (placeholder for now)
+  const xpLevel = 1
+  const xpProgress = 0
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
@@ -34,10 +89,10 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-medium">Current GPA</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">0.00</div>
+            <div className="text-3xl font-bold">{currentGPA.toFixed(2)}</div>
             <div className="mt-2 flex items-center text-sm">
               <TrendingUp className="mr-1 h-4 w-4" />
-              <span>Add courses to calculate</span>
+              <span>{courses.length > 0 ? `Based on ${courses.length} courses` : "Add courses to calculate"}</span>
             </div>
           </CardContent>
         </Card>
@@ -46,7 +101,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-medium">Fitness Score</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">0/100</div>
+            <div className="text-3xl font-bold">{fitnessScore}/100</div>
             <div className="mt-2 flex items-center text-sm">
               <TrendingUp className="mr-1 h-4 w-4" />
               <span>Track your CFA progress</span>
@@ -58,10 +113,10 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-medium">XP Level</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">Level 1</div>
+            <div className="text-3xl font-bold">Level {xpLevel}</div>
             <div className="mt-2 flex items-center text-sm">
-              <Progress value={0} className="h-2 w-full bg-white/20" />
-              <span className="ml-2 text-xs">0%</span>
+              <Progress value={xpProgress} className="h-2 w-full bg-white/20" />
+              <span className="ml-2 text-xs">{xpProgress}%</span>
             </div>
           </CardContent>
         </Card>
@@ -70,7 +125,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-medium">Application Progress</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">0%</div>
+            <div className="text-3xl font-bold">{applicationProgress}%</div>
             <div className="mt-2 flex items-center text-sm">
               <Flame className="mr-1 h-4 w-4" />
               <span>Get started!</span>

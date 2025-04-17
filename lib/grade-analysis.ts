@@ -222,3 +222,30 @@ export function calculateComparativeMetrics(
     mostConsistent,
   }
 }
+
+// Unified GPA calculation function for use across the application
+export function calculateGPA(courses: Course[], grades: Grade[]): number {
+  if (courses.length === 0) return 0
+
+  let totalPoints = 0
+  let totalCredits = 0
+  let validCourses = 0
+
+  for (const course of courses) {
+    if (!course.id) continue
+
+    // Calculate course grade
+    const courseGrades = grades.filter((g) => g.courseId === course.id)
+    if (courseGrades.length === 0) continue
+
+    const average = calculateCourseAverage(courseGrades)
+    const letterGrade = percentageToLetterGrade(average)
+    const gradePoints = letterGradeToPoints(letterGrade, course.isAP)
+
+    totalPoints += gradePoints * course.credits
+    totalCredits += course.credits
+    validCourses++
+  }
+
+  return totalCredits > 0 ? Number.parseFloat((totalPoints / totalCredits).toFixed(2)) : 0
+}

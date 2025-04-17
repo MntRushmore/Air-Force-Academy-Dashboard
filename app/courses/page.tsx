@@ -27,6 +27,7 @@ import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import { calculateGPA, percentageToLetterGrade } from "@/lib/grade-analysis"
 
 export default function CoursesPage() {
   // Use Dexie's useLiveQuery hook to get real-time updates from the database
@@ -172,22 +173,6 @@ export default function CoursesPage() {
     return { percentage, letterGrade }
   }
 
-  const percentageToLetterGrade = (percentage: number): string => {
-    if (percentage >= 97) return "A+"
-    if (percentage >= 93) return "A"
-    if (percentage >= 90) return "A-"
-    if (percentage >= 87) return "B+"
-    if (percentage >= 83) return "B"
-    if (percentage >= 80) return "B-"
-    if (percentage >= 77) return "C+"
-    if (percentage >= 73) return "C"
-    if (percentage >= 70) return "C-"
-    if (percentage >= 67) return "D+"
-    if (percentage >= 63) return "D"
-    if (percentage >= 60) return "D-"
-    return "F"
-  }
-
   const getCourseGradeColor = (percentage: number): string => {
     if (percentage >= 90) return "text-green-600 dark:text-green-400"
     if (percentage >= 80) return "text-blue-600 dark:text-blue-400"
@@ -196,53 +181,8 @@ export default function CoursesPage() {
     return "text-red-600 dark:text-red-400"
   }
 
-  const calculateGPA = (): number => {
-    if (courses.length === 0) return 0
-
-    let totalPoints = 0
-    let totalCredits = 0
-    let validCourses = 0
-
-    for (const course of courses) {
-      if (!course.id) continue
-
-      // Calculate course grade
-      const { percentage } = calculateCourseGrade(course.id)
-
-      // Only include courses that have grades
-      if (percentage > 0) {
-        const gradePoints = percentageToGradePoints(percentage, course.isAP)
-        totalPoints += gradePoints * course.credits
-        totalCredits += course.credits
-        validCourses++
-      }
-    }
-
-    return totalCredits > 0 ? Number.parseFloat((totalPoints / totalCredits).toFixed(2)) : 0
-  }
-
-  const percentageToGradePoints = (percentage: number, isAP: boolean): number => {
-    let points = 0
-
-    if (percentage >= 97) points = 4.0
-    else if (percentage >= 93) points = 4.0
-    else if (percentage >= 90) points = 3.7
-    else if (percentage >= 87) points = 3.3
-    else if (percentage >= 83) points = 3.0
-    else if (percentage >= 80) points = 2.7
-    else if (percentage >= 77) points = 2.3
-    else if (percentage >= 73) points = 2.0
-    else if (percentage >= 70) points = 1.7
-    else if (percentage >= 67) points = 1.3
-    else if (percentage >= 63) points = 1.0
-    else if (percentage >= 60) points = 0.7
-    else points = 0.0
-
-    // Add AP bonus
-    if (isAP) points = Math.min(4.0, points + 1.0)
-
-    return points
-  }
+  // Use the unified GPA calculation function
+  const currentGPA = calculateGPA(courses, grades)
 
   // Group courses by year
   const coursesByYear = filteredCourses.reduce(
@@ -269,7 +209,7 @@ export default function CoursesPage() {
             <CardTitle className="text-sm font-medium">Current GPA</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{calculateGPA()}</div>
+            <div className="text-3xl font-bold">{currentGPA}</div>
             <div className="mt-1 text-sm opacity-90">
               Based on {courses.length} course{courses.length !== 1 ? "s" : ""}
             </div>

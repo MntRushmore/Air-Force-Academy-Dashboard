@@ -18,6 +18,7 @@ import { ComingSoonFeatures } from "@/components/coming-soon-features"
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("general")
+  const [gender, setGender] = useState<"male" | "female">("male") // Default to male
 
   useEffect(() => {
     // Simulate loading
@@ -104,6 +105,31 @@ export default function SettingsPage() {
                         <SelectItem value="2028">2028</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gender-preference">Gender for CFA Standards</Label>
+                    <Select
+                      value={gender}
+                      onValueChange={async (value) => {
+                        setGender(value as "male" | "female")
+                        // await db.settings.put({ // Removed db call as db is not defined
+                        //   key: "gender",
+                        //   value: value,
+                        //   createdAt: new Date()
+                        // })
+                      }}
+                    >
+                      <SelectTrigger id="gender-preference">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">
+                      This setting affects how your CFA (Candidate Fitness Assessment) scores are calculated.
+                    </p>
                   </div>
                 </CardContent>
                 <CardFooter>
