@@ -64,7 +64,11 @@
     "uuid": "latest",
     "ical": "latest",
     "idb": "latest",
-    "jspdf-autotable": "latest"
+    "jspdf-autotable": "latest",
+    "@supabase/supabase-js": "latest",
+    "child_process": "latest",
+    "dotenv": "latest",
+    "path": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

@@ -10,6 +10,8 @@ import { AppHeader } from "@/components/app-header"
 import { Toaster } from "@/components/ui/toaster"
 import { db } from "@/lib/db"
 import { useSidebar } from "@/components/sidebar-provider"
+import { AuthProvider } from "@/components/auth-provider"
+import { RouteGuard } from "@/components/auth/route-guard"
 
 // Wrapper component to access sidebar context
 function MainLayout({ children }: { children: React.ReactNode }) {
@@ -47,10 +49,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <SidebarProvider>
-        <MainLayout>{children}</MainLayout>
-        <Toaster />
-      </SidebarProvider>
+      <AuthProvider>
+        <RouteGuard>
+          <SidebarProvider>
+            <MainLayout>{children}</MainLayout>
+            <Toaster />
+          </SidebarProvider>
+        </RouteGuard>
+      </AuthProvider>
     </ThemeProvider>
   )
 }
