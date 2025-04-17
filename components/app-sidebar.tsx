@@ -8,12 +8,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Dumbbell,
-  Gauge,
   GraduationCap,
   LayoutDashboard,
   Timer,
   Users,
   X,
+  BookOpen,
+  Target,
+  FileText,
+  Shield,
+  Settings,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -27,6 +31,11 @@ const navItems = [
     title: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Courses",
+    href: "/courses",
+    icon: BookOpen,
   },
   {
     title: "Timeline",
@@ -54,14 +63,24 @@ const navItems = [
     icon: BarChart3,
   },
   {
+    title: "Goals",
+    href: "/goals",
+    icon: Target,
+  },
+  {
     title: "Pomodoro",
     href: "/pomodoro",
     icon: Timer,
   },
   {
-    title: "Performance",
-    href: "/performance",
-    icon: Gauge,
+    title: "Journal",
+    href: "/journal",
+    icon: FileText,
+  },
+  {
+    title: "Settings",
+    href: "/settings",
+    icon: Settings,
   },
 ]
 
@@ -81,14 +100,14 @@ export function AppSidebar() {
           <Link href="/" className="flex items-center gap-2">
             {open ? (
               <div className="flex items-center gap-2">
-                <div className="rounded-md bg-primary p-1">
-                  <GraduationCap className="h-6 w-6 text-primary-foreground" />
+                <div className="rounded-md bg-[#0033a0] p-1">
+                  <Shield className="h-6 w-6 text-white" />
                 </div>
-                <span className="text-lg font-bold">USAFA Dashboard</span>
+                <span className="text-lg font-bold">USAFA Prep</span>
               </div>
             ) : (
-              <div className="rounded-md bg-primary p-1 mx-auto">
-                <GraduationCap className="h-6 w-6 text-primary-foreground" />
+              <div className="rounded-md bg-[#0033a0] p-1 mx-auto">
+                <Shield className="h-6 w-6 text-white" />
               </div>
             )}
           </Link>
@@ -105,7 +124,7 @@ export function AppSidebar() {
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent",
-                    pathname === item.href ? "bg-accent text-accent-foreground" : "text-muted-foreground",
+                    pathname === item.href ? "bg-[#0033a0] text-white" : "text-muted-foreground",
                     !open && "justify-center",
                   )}
                 >
@@ -123,10 +142,10 @@ export function AppSidebar() {
         <SheetContent side="left" className="p-0 w-64">
           <div className="flex h-16 items-center justify-between px-4 border-b">
             <Link href="/" className="flex items-center gap-2">
-              <div className="rounded-md bg-primary p-1">
-                <GraduationCap className="h-6 w-6 text-primary-foreground" />
+              <div className="rounded-md bg-[#0033a0] p-1">
+                <Shield className="h-6 w-6 text-white" />
               </div>
-              <span className="text-lg font-bold">USAFA Dashboard</span>
+              <span className="text-lg font-bold">USAFA Prep</span>
             </Link>
             <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)}>
               <X className="h-4 w-4" />
@@ -142,7 +161,7 @@ export function AppSidebar() {
                     onClick={() => setMobileOpen(false)}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent",
-                      pathname === item.href ? "bg-accent text-accent-foreground" : "text-muted-foreground",
+                      pathname === item.href ? "bg-[#0033a0] text-white" : "text-muted-foreground",
                     )}
                   >
                     <item.icon className="h-5 w-5" />

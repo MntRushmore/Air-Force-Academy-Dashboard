@@ -1,88 +1,112 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowRight, Dumbbell, LineChart, Plus, Target, Trash2 } from "lucide-react"
+import { useLiveQuery } from "dexie-react-hooks"
+import { Dumbbell, Plus, Target, Trophy, TrendingUp, Trash2 } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { db, type Exercise, addItem, deleteItem, updateItem } from "@/lib/db"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-type Exercise = {
-  id: string
-  name: string
-  target: number
-  current: number
-  unit: string
+// CFA standards for males (approximated)
+const cfaStandardsMale = {
+  "Basketball Throw": { min: 60, max: 102, unit: "feet" },
+  "Pull-ups": { min: 7, max: 18, unit: "reps" },
+  "Shuttle Run": { min: 8.1, max: 7.1, unit: "seconds", isReversed: true },
+  Crunches: { min: 58, max: 95, unit: "reps" },
+  "Push-ups": { min: 35, max: 75, unit: "reps" },
+  "1-Mile Run": { min: 7.3, max: 5.2, unit: "minutes", isReversed: true },
+}
+
+// CFA standards for females (approximated)
+const cfaStandardsFemale = {
+  "Basketball Throw": { min: 40, max: 66, unit: "feet" },
+  "Pull-ups": { min: 1, max: 7, unit: "reps" },
+  "Shuttle Run": { min: 9.1, max: 7.8, unit: "seconds", isReversed: true },
+  Crunches: { min: 50, max: 95, unit: "reps" },
+  "Push-ups": { min: 18, max: 41, unit: "reps" },
+  "1-Mile Run": { min: 8.3, max: 6.0, unit: "minutes", isReversed: true },
 }
 
 export default function FitnessPage() {
-  const [exercises, setExercises] = useState<Exercise[]>([
-    {
-      id: "1",
-      name: "Push-ups",
-      target: 62,
-      current: 45,
-      unit: "reps",
-    },
-    {
-      id: "2",
-      name: "Sit-ups",
-      target: 75,
-      current: 60,
-      unit: "reps",
-    },
-    {
-      id: "3",
-      name: "Pull-ups",
-      target: 12,
-      current: 8,
-      unit: "reps",
-    },
-    {
-      id: "4",
-      name: "1-Mile Run",
-      target: 6.5,
-      current: 7.2,
-      unit: "minutes",
-    },
-    {
-      id: "5",
-      name: "Shuttle Run",
-      target: 8.1,
-      current: 8.6,
-      unit: "seconds",
-    },
-    {
-      id: "6",
-      name: "Basketball Throw",
-      target: 70,
-      current: 62,
-      unit: "feet",
-    },
-  ])
-
-  const [newExercise, setNewExercise] = useState({
+  const exercises = useLiveQuery(() => db.exercises.toArray(), []) || []
+  const [gender, setGender] = useState<"male" | "female">("male")
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null)
+  const [newExercise, setNewExercise] = useState<Partial<Exercise>>({
     name: "",
     target: 0,
     current: 0,
     unit: "reps",
   })
 
-  const addExercise = () => {
-    if (!newExercise.name || newExercise.target <= 0) return
+  const cfaStandards = gender === "male" ? cfaStandardsMale : cfaStandardsFemale
 
-    const exercise: Exercise = {
-      id: String(Date.now()),
-      name: newExercise.name,
-      target: newExercise.target,
-      current: newExercise.current,
-      unit: newExercise.unit,
+  const calculateCFAScore = () => {
+    if (exercises.length === 0) return 0
+
+    const cfaExercises = ["Basketball Throw", "Pull-ups", "Shuttle Run", "Crunches", "Push-ups", "1-Mile Run"]
+
+    let totalScore = 0
+    let exerciseCount = 0
+
+    for (const exerciseName of cfaExercises) {
+      const exercise = exercises.find((e) => e.name === exerciseName)
+      if (!exercise) continue
+
+      const standard = cfaStandards[exerciseName as keyof typeof cfaStandards]
+      if (!standard) continue
+
+      let score = 0
+      if (standard.isReversed) {
+        // Lower is better (e.g., run time)
+        if (exercise.current <= standard.max) score = 100
+        else if (exercise.current >= standard.min) score = 0
+        else {
+          score = 100 - ((exercise.current - standard.max) / (standard.min - standard.max)) * 100
+        }
+      } else {
+        // Higher is better (e.g., push-ups)
+        if (exercise.current >= standard.max) score = 100
+        else if (exercise.current <= standard.min) score = 0
+        else {
+          score = ((exercise.current - standard.min) / (standard.max - standard.min)) * 100
+        }
+      }
+
+      totalScore += score
+      exerciseCount++
     }
 
-    setExercises([...exercises, exercise])
+    return exerciseCount > 0 ? Math.round(totalScore / exerciseCount) : 0
+  }
+
+  const addExercise = async () => {
+    if (!newExercise.name) return
+
+    const exercise: Exercise = {
+      name: newExercise.name,
+      target: newExercise.target || 0,
+      current: newExercise.current || 0,
+      unit: newExercise.unit || "reps",
+    }
+
+    await addItem(db.exercises, exercise)
+
     setNewExercise({
       name: "",
       target: 0,
@@ -91,487 +115,678 @@ export default function FitnessPage() {
     })
   }
 
-  const removeExercise = (id: string) => {
-    setExercises(exercises.filter((exercise) => exercise.id !== id))
+  const updateExercise = async (id: string, changes: Partial<Exercise>) => {
+    if (!id) return
+    await updateItem(db.exercises, id, changes)
   }
 
-  const updateExercise = (id: string, field: keyof Exercise, value: string | number) => {
-    setExercises(exercises.map((exercise) => (exercise.id === id ? { ...exercise, [field]: value } : exercise)))
+  const removeExercise = async (id: string) => {
+    if (!id) return
+    await deleteItem(db.exercises, id)
+    if (selectedExercise && selectedExercise.id === id) {
+      setSelectedExercise(null)
+    }
   }
 
-  const calculateProgress = (current: number, target: number) => {
-    return Math.min(100, Math.round((current / target) * 100))
-  }
+  const calculateProgress = (exercise: Exercise) => {
+    const standard = cfaStandards[exercise.name as keyof typeof cfaStandards]
 
-  const calculateOverallProgress = () => {
-    const totalProgress = exercises.reduce((sum, exercise) => {
-      // For running and shuttle run, lower is better
-      if (exercise.name.includes("Run") && exercise.current > 0 && exercise.target > 0) {
-        return sum + Math.min(100, Math.round((exercise.target / exercise.current) * 100))
+    if (!standard) return { percentage: (exercise.current / exercise.target) * 100, score: 0 }
+
+    let score = 0
+    if (standard.isReversed) {
+      // Lower is better (e.g., run time)
+      if (exercise.current <= standard.max) score = 100
+      else if (exercise.current >= standard.min) score = 0
+      else {
+        score = 100 - ((exercise.current - standard.max) / (standard.min - standard.max)) * 100
       }
-      return sum + calculateProgress(exercise.current, exercise.target)
-    }, 0)
+    } else {
+      // Higher is better (e.g., push-ups)
+      if (exercise.current >= standard.max) score = 100
+      else if (exercise.current <= standard.min) score = 0
+      else {
+        score = ((exercise.current - standard.min) / (standard.max - standard.min)) * 100
+      }
+    }
 
-    return Math.round(totalProgress / exercises.length)
+    return {
+      percentage: Math.min(100, Math.max(0, (exercise.current / exercise.target) * 100)),
+      score: Math.round(score),
+    }
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Fitness Tracker</h1>
-        <p className="text-muted-foreground">Track your progress toward USAFA Candidate Fitness Assessment standards</p>
+        <p className="text-muted-foreground">Prepare for the Candidate Fitness Assessment (CFA)</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-gradient-to-br from-[#0033a0] to-[#003db8] text-white">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Overall Fitness Score</CardTitle>
+            <CardTitle className="text-sm font-medium">CFA Score</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{calculateOverallProgress()}%</div>
-            <Progress value={calculateOverallProgress()} className="h-2 mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">CFA Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              {calculateOverallProgress() >= 85 ? (
-                <div className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-600 dark:bg-green-900 dark:text-green-400">
-                  Excellent
-                </div>
-              ) : calculateOverallProgress() >= 70 ? (
-                <div className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-600 dark:bg-blue-900 dark:text-blue-400">
-                  Good
-                </div>
-              ) : calculateOverallProgress() >= 50 ? (
-                <div className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-600 dark:bg-amber-900 dark:text-amber-400">
-                  Satisfactory
-                </div>
-              ) : (
-                <div className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-600 dark:bg-red-900 dark:text-red-400">
-                  Needs Improvement
-                </div>
-              )}
+            <div className="text-3xl font-bold">{calculateCFAScore()}/100</div>
+            <div className="mt-2 flex items-center text-sm">
+              <TrendingUp className="mr-1 h-4 w-4" />
+              <span>Based on current performance</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-[#7d8ca3] to-[#a1afc2] text-white">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Strongest Event</CardTitle>
+            <CardTitle className="text-sm font-medium">CFA Standards</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-medium">Push-ups</div>
-            <div className="text-sm text-muted-foreground">73% of target</div>
+            <div className="text-3xl font-bold capitalize">{gender}</div>
+            <div className="mt-2 flex items-center text-sm">
+              <Select value={gender} onValueChange={(value) => setGender(value as "male" | "female")}>
+                <SelectTrigger className="h-8 w-32 border-white/20 bg-white/10 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-[#0033a0] to-[#003db8] text-white">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Focus Area</CardTitle>
+            <CardTitle className="text-sm font-medium">Exercises Tracked</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-medium">1-Mile Run</div>
-            <div className="text-sm text-muted-foreground">90% of target</div>
+            <div className="text-3xl font-bold">{exercises.length}</div>
+            <div className="mt-2 flex items-center text-sm">
+              <Dumbbell className="mr-1 h-4 w-4" />
+              <span>{exercises.length === 6 ? "All CFA events tracked" : "Add more exercises"}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-[#7d8ca3] to-[#a1afc2] text-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Next Milestone</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{exercises.length > 0 ? "Improve Score" : "Add Exercises"}</div>
+            <div className="mt-2 flex items-center text-sm">
+              <Target className="mr-1 h-4 w-4" />
+              <span>Track your progress</span>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="tracker" className="space-y-4">
+      <Tabs defaultValue="exercises" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="tracker">CFA Tracker</TabsTrigger>
+          <TabsTrigger value="exercises">CFA Exercises</TabsTrigger>
           <TabsTrigger value="standards">CFA Standards</TabsTrigger>
-          <TabsTrigger value="workouts">Workout Plans</TabsTrigger>
+          <TabsTrigger value="training">Training Plans</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="tracker" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Candidate Fitness Assessment</CardTitle>
-              <CardDescription>Track your progress on the six CFA events</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {exercises.map((exercise) => (
-                <div key={exercise.id} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Dumbbell className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-medium">{exercise.name}</span>
+        <TabsContent value="exercises" className="space-y-4">
+          <div className="flex justify-between">
+            <h2 className="text-xl font-semibold">Your Exercises</h2>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" /> Add Exercise
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Exercise</DialogTitle>
+                  <DialogDescription>Track a new exercise for your CFA preparation</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="exercise-name">Exercise Name</Label>
+                    <Select
+                      value={newExercise.name}
+                      onValueChange={(value) => {
+                        const standard = cfaStandards[value as keyof typeof cfaStandards]
+                        setNewExercise({
+                          ...newExercise,
+                          name: value,
+                          unit: standard?.unit || "reps",
+                          target: standard?.max || 0,
+                        })
+                      }}
+                    >
+                      <SelectTrigger id="exercise-name">
+                        <SelectValue placeholder="Select exercise" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Basketball Throw">Basketball Throw</SelectItem>
+                        <SelectItem value="Pull-ups">Pull-ups</SelectItem>
+                        <SelectItem value="Shuttle Run">Shuttle Run</SelectItem>
+                        <SelectItem value="Crunches">Crunches</SelectItem>
+                        <SelectItem value="Push-ups">Push-ups</SelectItem>
+                        <SelectItem value="1-Mile Run">1-Mile Run</SelectItem>
+                        <SelectItem value="Custom Exercise">Custom Exercise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {newExercise.name === "Custom Exercise" && (
+                      <Input
+                        className="mt-2"
+                        placeholder="Enter exercise name"
+                        value={newExercise.name === "Custom Exercise" ? "" : newExercise.name}
+                        onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })}
+                      />
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="exercise-current">Current Value</Label>
+                      <Input
+                        id="exercise-current"
+                        type="number"
+                        step="0.1"
+                        value={newExercise.current}
+                        onChange={(e) => setNewExercise({ ...newExercise, current: Number(e.target.value) })}
+                      />
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          value={exercise.current}
-                          onChange={(e) =>
-                            updateExercise(exercise.id, "current", Number.parseFloat(e.target.value) || 0)
-                          }
-                          className="w-16 h-8"
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          / {exercise.target} {exercise.unit}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => removeExercise(exercise.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div className="space-y-2">
+                      <Label htmlFor="exercise-target">Target Value</Label>
+                      <Input
+                        id="exercise-target"
+                        type="number"
+                        step="0.1"
+                        value={newExercise.target}
+                        onChange={(e) => setNewExercise({ ...newExercise, target: Number(e.target.value) })}
+                      />
                     </div>
                   </div>
-                  <Progress
-                    value={
-                      exercise.name.includes("Run") && exercise.current > 0 && exercise.target > 0
-                        ? Math.min(100, Math.round((exercise.target / exercise.current) * 100))
-                        : calculateProgress(exercise.current, exercise.target)
-                    }
-                    className="h-2"
-                  />
-                </div>
-              ))}
-            </CardContent>
-            <CardFooter className="flex flex-col gap-4">
-              <div className="grid w-full gap-4 md:grid-cols-4">
-                <div className="space-y-2">
-                  <Label htmlFor="exercise-name">Exercise Name</Label>
-                  <Input
-                    id="exercise-name"
-                    value={newExercise.name}
-                    onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })}
-                    placeholder="Exercise name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="exercise-target">Target</Label>
-                  <Input
-                    id="exercise-target"
-                    type="number"
-                    value={newExercise.target || ""}
-                    onChange={(e) => setNewExercise({ ...newExercise, target: Number.parseFloat(e.target.value) || 0 })}
-                    placeholder="Target value"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="exercise-current">Current</Label>
-                  <Input
-                    id="exercise-current"
-                    type="number"
-                    value={newExercise.current || ""}
-                    onChange={(e) =>
-                      setNewExercise({ ...newExercise, current: Number.parseFloat(e.target.value) || 0 })
-                    }
-                    placeholder="Current value"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="exercise-unit">Unit</Label>
-                  <Select
-                    value={newExercise.unit}
-                    onValueChange={(value) => setNewExercise({ ...newExercise, unit: value })}
-                  >
-                    <SelectTrigger id="exercise-unit">
-                      <SelectValue placeholder="Select unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="reps">Repetitions</SelectItem>
-                      <SelectItem value="minutes">Minutes</SelectItem>
-                      <SelectItem value="seconds">Seconds</SelectItem>
-                      <SelectItem value="feet">Feet</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <Button onClick={addExercise} className="w-full">
-                <Plus className="mr-2 h-4 w-4" /> Add Exercise
-              </Button>
-            </CardFooter>
-          </Card>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Progress Chart</CardTitle>
-                <CardDescription>Your fitness improvement over time</CardDescription>
-              </CardHeader>
-              <CardContent className="h-80 flex items-center justify-center">
-                <div className="flex flex-col items-center text-center text-muted-foreground">
-                  <LineChart className="h-16 w-16 mb-4" />
-                  <p>Progress chart visualization will appear here</p>
-                  <p className="text-sm">Track your progress over time to see improvements</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="exercise-unit">Unit</Label>
+                    <Select
+                      value={newExercise.unit}
+                      onValueChange={(value) => setNewExercise({ ...newExercise, unit: value })}
+                    >
+                      <SelectTrigger id="exercise-unit">
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="reps">Repetitions</SelectItem>
+                        <SelectItem value="seconds">Seconds</SelectItem>
+                        <SelectItem value="minutes">Minutes</SelectItem>
+                        <SelectItem value="feet">Feet</SelectItem>
+                        <SelectItem value="meters">Meters</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+                <DialogFooter>
+                  <Button onClick={addExercise}>Add Exercise</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {exercises.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+                <Dumbbell className="h-12 w-12 text-[#0033a0] mb-4" />
+                <h3 className="text-lg font-medium">No exercises added yet</h3>
+                <p className="text-sm text-muted-foreground mt-1">Add exercises to track your CFA preparation</p>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="mt-4">
+                      <Plus className="mr-2 h-4 w-4" /> Add CFA Exercises
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add CFA Exercises</DialogTitle>
+                      <DialogDescription>Add all six CFA exercises to your tracker</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <p className="mb-4">
+                        This will add all six Candidate Fitness Assessment (CFA) exercises to your tracker with default
+                        values. You can update your current performance after adding them.
+                      </p>
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>Basketball Throw</li>
+                        <li>Pull-ups</li>
+                        <li>Shuttle Run</li>
+                        <li>Crunches</li>
+                        <li>Push-ups</li>
+                        <li>1-Mile Run</li>
+                      </ul>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        onClick={async () => {
+                          const standards = gender === "male" ? cfaStandardsMale : cfaStandardsFemale
+
+                          for (const [name, standard] of Object.entries(standards)) {
+                            await addItem(db.exercises, {
+                              name,
+                              current: standard.min,
+                              target: standard.max,
+                              unit: standard.unit,
+                            })
+                          }
+
+                          // Close dialog
+                          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+                        }}
+                      >
+                        Add All CFA Exercises
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {exercises.map((exercise) => {
+                const { percentage, score } = calculateProgress(exercise)
 
+                return (
+                  <Card
+                    key={exercise.id}
+                    className={`overflow-hidden cursor-pointer transition-all hover:shadow-md ${
+                      selectedExercise?.id === exercise.id ? "ring-2 ring-[#0033a0]" : ""
+                    }`}
+                    onClick={() => setSelectedExercise(exercise)}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle>{exercise.name}</CardTitle>
+                        <div className="text-xl font-bold text-[#0033a0]">{score}/100</div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Current:</span>
+                          <span className="font-medium">
+                            {exercise.current} {exercise.unit}
+                          </span>
+                        </div>
+                        <Progress value={percentage} className="h-2" />
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Target:</span>
+                          <span>
+                            {exercise.target} {exercise.unit}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (exercise.id) {
+                              removeExercise(exercise.id)
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+
+          {selectedExercise && (
             <Card>
               <CardHeader>
-                <CardTitle>Fitness Goals</CardTitle>
-                <CardDescription>Your current fitness objectives</CardDescription>
+                <CardTitle>Update {selectedExercise.name}</CardTitle>
+                <CardDescription>Track your progress over time</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900">
-                    <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="update-current">Current Value</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="update-current"
+                        type="number"
+                        step="0.1"
+                        value={selectedExercise.current}
+                        onChange={(e) => {
+                          if (selectedExercise.id) {
+                            updateExercise(selectedExercise.id, {
+                              current: Number(e.target.value),
+                            })
+                          }
+                        }}
+                      />
+                      <span>{selectedExercise.unit}</span>
+                    </div>
                   </div>
-                  <div className="space-y-0.5">
-                    <div className="font-medium">Improve 1-Mile Run Time</div>
-                    <div className="text-sm text-muted-foreground">Target: 6:30 by November 15</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900">
-                    <Target className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div className="space-y-0.5">
-                    <div className="font-medium">Increase Push-ups</div>
-                    <div className="text-sm text-muted-foreground">Target: 60 reps by December 1</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900">
-                    <Target className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div className="space-y-0.5">
-                    <div className="font-medium">Complete Full CFA</div>
-                    <div className="text-sm text-muted-foreground">Target: Pass all events by January 15</div>
+                  <div className="space-y-2">
+                    <Label htmlFor="update-target">Target Value</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="update-target"
+                        type="number"
+                        step="0.1"
+                        value={selectedExercise.target}
+                        onChange={(e) => {
+                          if (selectedExercise.id) {
+                            updateExercise(selectedExercise.id, {
+                              target: Number(e.target.value),
+                            })
+                          }
+                        }}
+                      />
+                      <span>{selectedExercise.unit}</span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
-              <CardFooter>
-                <Button variant="outline" className="w-full">
-                  Add New Goal <ArrowRight className="ml-2 h-4 w-4" />
+              <CardFooter className="flex justify-between">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedExercise(null)
+                  }}
+                >
+                  Close
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    if (selectedExercise.id) {
+                      removeExercise(selectedExercise.id)
+                    }
+                  }}
+                >
+                  Delete Exercise
                 </Button>
               </CardFooter>
             </Card>
-          </div>
+          )}
         </TabsContent>
 
         <TabsContent value="standards" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>USAFA CFA Standards</CardTitle>
-              <CardDescription>Official Candidate Fitness Assessment requirements</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>CFA Standards for {gender === "male" ? "Males" : "Females"}</CardTitle>
+                  <CardDescription>Candidate Fitness Assessment requirements for USAFA</CardDescription>
+                </div>
+                <Select value={gender} onValueChange={(value) => setGender(value as "male" | "female")}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="py-3 text-left font-medium">Event</th>
-                      <th className="py-3 text-left font-medium">Male (Excellent)</th>
-                      <th className="py-3 text-left font-medium">Male (Minimum)</th>
-                      <th className="py-3 text-left font-medium">Female (Excellent)</th>
-                      <th className="py-3 text-left font-medium">Female (Minimum)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b">
-                      <td className="py-3">Basketball Throw</td>
-                      <td className="py-3">102 feet</td>
-                      <td className="py-3">67 feet</td>
-                      <td className="py-3">68 feet</td>
-                      <td className="py-3">41 feet</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-3">Pull-ups</td>
-                      <td className="py-3">18 reps</td>
-                      <td className="py-3">7 reps</td>
-                      <td className="py-3">7 reps</td>
-                      <td className="py-3">1 rep</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-3">Shuttle Run</td>
-                      <td className="py-3">7.8 seconds</td>
-                      <td className="py-3">8.7 seconds</td>
-                      <td className="py-3">8.6 seconds</td>
-                      <td className="py-3">9.4 seconds</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-3">Modified Sit-ups</td>
-                      <td className="py-3">95 reps</td>
-                      <td className="py-3">58 reps</td>
-                      <td className="py-3">95 reps</td>
-                      <td className="py-3">58 reps</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-3">Push-ups</td>
-                      <td className="py-3">75 reps</td>
-                      <td className="py-3">42 reps</td>
-                      <td className="py-3">50 reps</td>
-                      <td className="py-3">19 reps</td>
-                    </tr>
-                    <tr>
-                      <td className="py-3">1-Mile Run</td>
-                      <td className="py-3">5:20 min</td>
-                      <td className="py-3">7:30 min</td>
-                      <td className="py-3">6:00 min</td>
-                      <td className="py-3">8:30 min</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Exercise</TableHead>
+                    <TableHead>Minimum</TableHead>
+                    <TableHead>Average</TableHead>
+                    <TableHead>Competitive</TableHead>
+                    <TableHead>Unit</TableHead>
+                    <TableHead>Your Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Object.entries(cfaStandards).map(([name, standard]) => {
+                    const exercise = exercises.find((e) => e.name === name)
+                    const average = (standard.min + standard.max) / 2
+
+                    let status = "Not Started"
+                    let statusColor = "text-slate-500"
+
+                    if (exercise) {
+                      if (standard.isReversed) {
+                        // Lower is better
+                        if (exercise.current <= standard.max) {
+                          status = "Excellent"
+                          statusColor = "text-green-600 dark:text-green-400"
+                        } else if (exercise.current <= average) {
+                          status = "Good"
+                          statusColor = "text-blue-600 dark:text-blue-400"
+                        } else if (exercise.current <= standard.min) {
+                          status = "Needs Work"
+                          statusColor = "text-amber-600 dark:text-amber-400"
+                        } else {
+                          status = "Below Minimum"
+                          statusColor = "text-red-600 dark:text-red-400"
+                        }
+                      } else {
+                        // Higher is better
+                        if (exercise.current >= standard.max) {
+                          status = "Excellent"
+                          statusColor = "text-green-600 dark:text-green-400"
+                        } else if (exercise.current >= average) {
+                          status = "Good"
+                          statusColor = "text-blue-600 dark:text-blue-400"
+                        } else if (exercise.current >= standard.min) {
+                          status = "Needs Work"
+                          statusColor = "text-amber-600 dark:text-amber-400"
+                        } else {
+                          status = "Below Minimum"
+                          statusColor = "text-red-600 dark:text-red-400"
+                        }
+                      }
+                    }
+
+                    return (
+                      <TableRow key={name}>
+                        <TableCell className="font-medium">{name}</TableCell>
+                        <TableCell>
+                          {standard.min} {standard.unit}
+                        </TableCell>
+                        <TableCell>
+                          {average.toFixed(1)} {standard.unit}
+                        </TableCell>
+                        <TableCell>
+                          {standard.max} {standard.unit}
+                        </TableCell>
+                        <TableCell>{standard.unit}</TableCell>
+                        <TableCell className={statusColor}>{status}</TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>CFA Testing Procedures</CardTitle>
-              <CardDescription>How each event is properly conducted</CardDescription>
+              <CardTitle>About the CFA</CardTitle>
+              <CardDescription>Understanding the Candidate Fitness Assessment</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-medium">Basketball Throw</h3>
-                <p className="text-sm text-muted-foreground">
-                  Performed with a men's basketball from a kneeling position. The candidate throws the basketball as far
-                  as possible from a kneeling position. The best of three attempts is recorded.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-medium">Pull-ups</h3>
-                <p className="text-sm text-muted-foreground">
-                  Performed on a horizontal bar with palms facing away. The candidate must pull up until the chin is
-                  above the bar and then lower completely. Kipping or leg movement is not permitted.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-medium">Shuttle Run</h3>
-                <p className="text-sm text-muted-foreground">
-                  Two parallel lines are marked 30 feet apart. The candidate starts behind one line, runs to the other
-                  line, touches it with their hand, returns to the starting line, touches it, and repeats. Time stops
-                  when the candidate crosses the starting line the second time.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-medium">Modified Sit-ups</h3>
-                <p className="text-sm text-muted-foreground">
-                  Performed with knees bent at 90 degrees and feet held by a partner. Arms are crossed over the chest.
-                  The candidate must curl up until the elbows touch the thighs and then return until the shoulder blades
-                  touch the ground. Maximum reps in 2 minutes.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-medium">Push-ups</h3>
-                <p className="text-sm text-muted-foreground">
-                  Performed with hands shoulder-width apart. The candidate must lower until the arms form a 90-degree
-                  angle and then push up to the starting position. The back must remain straight throughout. Maximum
-                  reps in 2 minutes.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-medium">1-Mile Run</h3>
-                <p className="text-sm text-muted-foreground">
-                  Performed on a measured track or flat surface. The candidate must complete the distance as quickly as
-                  possible. Time is recorded in minutes and seconds.
-                </p>
-              </div>
+              <p>
+                The Candidate Fitness Assessment (CFA) is a test of strength, agility, speed and endurance used to
+                predict a candidate's aptitude for the physical program at the United States Air Force Academy. The CFA
+                consists of six events:
+              </p>
+              <ol className="list-decimal pl-5 space-y-2">
+                <li>
+                  <span className="font-medium">Basketball Throw</span> - Measures upper body strength and coordination
+                </li>
+                <li>
+                  <span className="font-medium">Pull-ups</span> - Measures upper body strength and endurance
+                </li>
+                <li>
+                  <span className="font-medium">Shuttle Run</span> - Measures agility, speed and coordination
+                </li>
+                <li>
+                  <span className="font-medium">Crunches</span> - Measures abdominal strength and endurance
+                </li>
+                <li>
+                  <span className="font-medium">Push-ups</span> - Measures upper body strength and endurance
+                </li>
+                <li>
+                  <span className="font-medium">1-Mile Run</span> - Measures aerobic capacity and endurance
+                </li>
+              </ol>
+              <p>
+                The CFA must be administered by a physical education teacher, an officer in any branch of the military,
+                or a USAFA Admissions Liaison Officer (ALO). The assessment must be completed according to specific
+                guidelines and submitted as part of your application.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="workouts" className="space-y-4">
+        <TabsContent value="training" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Recommended Workout Plans</CardTitle>
-              <CardDescription>Training programs to improve your CFA performance</CardDescription>
+              <CardTitle>CFA Training Plans</CardTitle>
+              <CardDescription>Structured workouts to improve your performance</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <h3 className="font-medium">Push-up Improvement Plan</h3>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <strong>Week 1-2:</strong> 3 sets of max push-ups, 3 times per week
-                  </p>
-                  <p>
-                    <strong>Week 3-4:</strong> 5 sets of max push-ups, 3 times per week
-                  </p>
-                  <p>
-                    <strong>Week 5-6:</strong> Pyramid sets (5-10-15-10-5), 4 times per week
-                  </p>
-                  <p>
-                    <strong>Week 7-8:</strong> 100 push-ups per day, broken into sets as needed
-                  </p>
+              <div className="rounded-lg border p-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0033a0]">
+                    <Trophy className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium">12-Week CFA Preparation Plan</h3>
+                    <p className="text-sm text-muted-foreground">Comprehensive training to maximize your CFA score</p>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Week 1-4: Foundation</span>
+                      <span>Build baseline fitness</span>
+                    </div>
+                    <Progress value={100} className="h-2" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Week 5-8: Development</span>
+                      <span>Increase intensity</span>
+                    </div>
+                    <Progress value={100} className="h-2" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Week 9-12: Peak Performance</span>
+                      <span>Maximize results</span>
+                    </div>
+                    <Progress value={100} className="h-2" />
+                  </div>
+                </div>
+                <Button className="mt-4 w-full">View Full Plan</Button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <h3 className="text-lg font-medium">Upper Body Strength</h3>
+                  <p className="text-sm text-muted-foreground mt-1 mb-4">Focus on pull-ups and push-ups</p>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>3 sets of max effort pull-ups, 3 times per week</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>5 sets of push-ups (to failure), every other day</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>Assisted pull-up training for progression</span>
+                    </li>
+                  </ul>
+                  <Button variant="outline" className="mt-4 w-full">
+                    View Workout
+                  </Button>
+                </div>
+
+                <div className="rounded-lg border p-4">
+                  <h3 className="text-lg font-medium">Cardio Endurance</h3>
+                  <p className="text-sm text-muted-foreground mt-1 mb-4">Improve 1-mile run time</p>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>Interval training: 400m repeats</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>Tempo runs: 2-3 miles at moderate pace</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>Weekly long run for endurance building</span>
+                    </li>
+                  </ul>
+                  <Button variant="outline" className="mt-4 w-full">
+                    View Workout
+                  </Button>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <h3 className="font-medium">Running Improvement Plan</h3>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <strong>Week 1-2:</strong> 3 runs per week (1 mile, 2 miles, interval training)
-                  </p>
-                  <p>
-                    <strong>Week 3-4:</strong> 4 runs per week (add hill sprints)
-                  </p>
-                  <p>
-                    <strong>Week 5-6:</strong> 4 runs per week (increase intensity of intervals)
-                  </p>
-                  <p>
-                    <strong>Week 7-8:</strong> 5 runs per week (include time trials)
-                  </p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <h3 className="text-lg font-medium">Core Strength</h3>
+                  <p className="text-sm text-muted-foreground mt-1 mb-4">Maximize crunches performance</p>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>Plank variations: 3 sets of 60 seconds</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>Russian twists: 3 sets of 20 reps</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>Leg raises: 3 sets of 15 reps</span>
+                    </li>
+                  </ul>
+                  <Button variant="outline" className="mt-4 w-full">
+                    View Workout
+                  </Button>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <h3 className="font-medium">Pull-up Improvement Plan</h3>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <strong>Week 1-2:</strong> Assisted pull-ups and negative pull-ups, 3 times per week
-                  </p>
-                  <p>
-                    <strong>Week 3-4:</strong> 3 sets of max pull-ups, 3 times per week
-                  </p>
-                  <p>
-                    <strong>Week 5-6:</strong> Pyramid sets (1-2-3-2-1), 3 times per week
-                  </p>
-                  <p>
-                    <strong>Week 7-8:</strong> 5 sets of max pull-ups, 3 times per week
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-medium">Complete CFA Training Schedule</h3>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <strong>Monday:</strong> Push-ups and sit-ups focus
-                  </p>
-                  <p>
-                    <strong>Tuesday:</strong> Running (intervals or distance)
-                  </p>
-                  <p>
-                    <strong>Wednesday:</strong> Pull-ups and basketball throw practice
-                  </p>
-                  <p>
-                    <strong>Thursday:</strong> Running and shuttle run practice
-                  </p>
-                  <p>
-                    <strong>Friday:</strong> Full CFA practice (all events)
-                  </p>
-                  <p>
-                    <strong>Saturday:</strong> Light cardio or active recovery
-                  </p>
-                  <p>
-                    <strong>Sunday:</strong> Rest day
-                  </p>
+                <div className="rounded-lg border p-4">
+                  <h3 className="text-lg font-medium">Agility Training</h3>
+                  <p className="text-sm text-muted-foreground mt-1 mb-4">Improve shuttle run performance</p>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>Ladder drills: 5 minutes, 3 times per week</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>Cone drills: 5 sets with full recovery</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-[#0033a0]" />
+                      <span>Shuttle run practice: 10 repetitions</span>
+                    </li>
+                  </ul>
+                  <Button variant="outline" className="mt-4 w-full">
+                    View Workout
+                  </Button>
                 </div>
               </div>
             </CardContent>
-            <CardFooter>
-              <Button variant="outline" className="w-full">
-                Download Complete Training Plan
-              </Button>
-            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>

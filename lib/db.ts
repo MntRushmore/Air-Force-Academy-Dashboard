@@ -83,6 +83,34 @@ export interface Goal {
   createdAt?: Date
 }
 
+// New interfaces for course management
+export interface Course {
+  id?: string
+  code: string
+  name: string
+  instructor: string
+  credits: number
+  semester: string
+  year: number
+  category: string // e.g., "STEM", "Humanities", "Physical Education"
+  isAP: boolean
+  notes: string
+  createdAt?: Date
+}
+
+export interface Grade {
+  id?: string
+  courseId: string
+  title: string
+  type: "exam" | "quiz" | "homework" | "project" | "paper" | "participation" | "other"
+  score: number
+  maxScore: number
+  weight: number // percentage weight in final grade
+  date: string
+  notes: string
+  createdAt?: Date
+}
+
 // Define our database
 class USAFADashboardDB extends Dexie {
   tasks!: Table<Task>
@@ -93,12 +121,14 @@ class USAFADashboardDB extends Dexie {
   questions!: Table<Question>
   exercises!: Table<Exercise>
   goals!: Table<Goal>
+  courses!: Table<Course>
+  grades!: Table<Grade>
 
   constructor() {
     super("USAFADashboardDB")
 
     // Define tables and their primary keys and indexes
-    this.version(1).stores({
+    this.version(2).stores({
       tasks: "++id, subject, dueDate, completed, priority, createdAt",
       events: "++id, date, type, createdAt",
       journalEntries: "++id, date, category, mood, createdAt",
@@ -107,6 +137,8 @@ class USAFADashboardDB extends Dexie {
       questions: "++id, category, status, createdAt",
       exercises: "++id, name, createdAt",
       goals: "++id, category, completed, deadline, createdAt",
+      courses: "++id, code, name, semester, year, category, isAP, createdAt",
+      grades: "++id, courseId, type, date, createdAt",
     })
   }
 }
@@ -136,295 +168,128 @@ export async function getAllItems<T>(table: Table<T>): Promise<T[]> {
   return await table.toArray()
 }
 
-// Initialize with sample data if the database is empty
-export async function initializeDBWithSampleData() {
-  // Check if we already have data
-  const taskCount = await db.tasks.count()
+// Initialize empty database
+export async function initializeEmptyDB() {
+  // No sample data - just ensure the database is created
+  console.log("Database initialized with empty tables")
+}
 
-  if (taskCount > 0) {
-    return // Database already has data
+// CSV Import for grades
+export async function importGradesFromCSV(courseId: string, csvContent: string): Promise<void> {
+  try {
+    // Parse CSV content
+    const lines = csvContent.split("\n")
+    const headers = lines[0].split(",")
+
+    // Find indices for required columns
+    const titleIndex = headers.findIndex((h) => h.toLowerCase().includes("title") || h.toLowerCase().includes("name"))
+    const typeIndex = headers.findIndex((h) => h.toLowerCase().includes("type") || h.toLowerCase().includes("category"))
+    const scoreIndex = headers.findIndex((h) => h.toLowerCase().includes("score") || h.toLowerCase().includes("points"))
+    const maxScoreIndex = headers.findIndex((h) => h.toLowerCase().includes("max") || h.toLowerCase().includes("total"))
+    const weightIndex = headers.findIndex(
+      (h) => h.toLowerCase().includes("weight") || h.toLowerCase().includes("percent"),
+    )
+    const dateIndex = headers.findIndex((h) => h.toLowerCase().includes("date"))
+
+    // Validate required columns
+    if (titleIndex === -1 || scoreIndex === -1) {
+      throw new Error("CSV must contain at least 'title/name' and 'score' columns")
+    }
+
+    // Process data rows
+    const grades: Grade[] = []
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue
+
+      const values = lines[i].split(",")
+
+      const grade: Grade = {
+        courseId,
+        title: values[titleIndex].trim(),
+        type: typeIndex !== -1 ? mapGradeType(values[typeIndex].trim()) : "other",
+        score: Number.parseFloat(values[scoreIndex].trim()),
+        maxScore: maxScoreIndex !== -1 ? Number.parseFloat(values[maxScoreIndex].trim()) : 100,
+        weight: weightIndex !== -1 ? Number.parseFloat(values[weightIndex].trim()) : 1,
+        date: dateIndex !== -1 ? values[dateIndex].trim() : new Date().toISOString().split("T")[0],
+        notes: "",
+      }
+
+      grades.push(grade)
+    }
+
+    // Add all grades to database
+    await db.grades.bulkAdd(grades)
+
+    return
+  } catch (error) {
+    console.error("Error importing grades:", error)
+    throw error
+  }
+}
+
+// Helper function to map grade types
+function mapGradeType(type: string): Grade["type"] {
+  type = type.toLowerCase()
+  if (type.includes("exam") || type.includes("test")) return "exam"
+  if (type.includes("quiz")) return "quiz"
+  if (type.includes("homework") || type.includes("hw")) return "homework"
+  if (type.includes("project")) return "project"
+  if (type.includes("paper") || type.includes("essay")) return "paper"
+  if (type.includes("participation")) return "participation"
+  return "other"
+}
+
+// Calculate GPA
+export function calculateGPA(courses: Course[], grades: Grade[]): number {
+  if (courses.length === 0) return 0
+
+  let totalPoints = 0
+  let totalCredits = 0
+
+  for (const course of courses) {
+    // Calculate course grade
+    const courseGrades = grades.filter((g) => g.courseId === course.id)
+    if (courseGrades.length === 0) continue
+
+    let weightedSum = 0
+    let weightSum = 0
+
+    for (const grade of courseGrades) {
+      const percentage = (grade.score / grade.maxScore) * 100
+      weightedSum += percentage * grade.weight
+      weightSum += grade.weight
+    }
+
+    const coursePercentage = weightSum > 0 ? weightedSum / weightSum : 0
+    const gradePoints = percentageToGradePoints(coursePercentage, course.isAP)
+
+    totalPoints += gradePoints * course.credits
+    totalCredits += course.credits
   }
 
-  // Sample tasks
-  const sampleTasks: Task[] = [
-    {
-      id: "1",
-      title: "Complete Calculus Problem Set",
-      description: "Chapters 4-5 exercises",
-      dueDate: "2023-11-15",
-      priority: "high",
-      completed: false,
-      subject: "Mathematics",
-    },
-    {
-      id: "2",
-      title: "Physics Lab Report",
-      description: "Write up results from the momentum experiment",
-      dueDate: "2023-11-18",
-      priority: "medium",
-      completed: false,
-      subject: "Physics",
-    },
-    {
-      id: "3",
-      title: "English Essay Draft",
-      description: "First draft of analysis paper",
-      dueDate: "2023-11-20",
-      priority: "medium",
-      completed: false,
-      subject: "English",
-    },
-    {
-      id: "4",
-      title: "SAT Practice Test",
-      description: "Complete full practice test with timing",
-      dueDate: "2023-11-12",
-      priority: "high",
-      completed: true,
-      subject: "Test Prep",
-    },
-  ]
+  return totalCredits > 0 ? totalPoints / totalCredits : 0
+}
 
-  // Sample events
-  const sampleEvents: Event[] = [
-    {
-      id: "1",
-      title: "AP Calculus",
-      date: "2023-11-13",
-      startTime: "08:00",
-      endTime: "09:30",
-      type: "class",
-    },
-    {
-      id: "2",
-      title: "Physics Study Group",
-      date: "2023-11-13",
-      startTime: "16:00",
-      endTime: "17:30",
-      type: "study",
-    },
-    {
-      id: "3",
-      title: "English Literature",
-      date: "2023-11-14",
-      startTime: "10:00",
-      endTime: "11:30",
-      type: "class",
-    },
-    {
-      id: "4",
-      title: "Chemistry Midterm",
-      date: "2023-11-17",
-      startTime: "13:00",
-      endTime: "15:00",
-      type: "exam",
-    },
-  ]
+// Helper function to convert percentage to grade points
+function percentageToGradePoints(percentage: number, isAP: boolean): number {
+  let points = 0
 
-  // Sample journal entries
-  const sampleJournalEntries: JournalEntry[] = [
-    {
-      id: "1",
-      title: "Congressional Nomination Interview",
-      content:
-        "Today I had my interview for the congressional nomination. I was nervous at first, but I think it went well. The panel asked about my leadership experience, academic goals, and why I want to attend USAFA. I emphasized my commitment to service and my passion for aerospace engineering. They seemed impressed by my water polo achievements and community service work. I need to follow up with a thank you email tomorrow.",
-      date: "2023-11-10",
-      category: "Application",
-      tags: ["interview", "congressional nomination", "USAFA"],
-      mood: "excited",
-    },
-    {
-      id: "2",
-      title: "Physics Test Preparation",
-      content:
-        "Spent 3 hours studying for the AP Physics C exam. Focused on rotational mechanics and magnetism, which have been challenging. Worked through 20 practice problems and reviewed my notes from the last two weeks. I'm feeling more confident about the concepts, but I still need to work on time management during problem-solving. Planning to do a full practice test this weekend to gauge my readiness.",
-      date: "2023-11-08",
-      category: "Academic",
-      tags: ["physics", "AP exam", "study"],
-      mood: "focused",
-    },
-    {
-      id: "3",
-      title: "Water Polo Tournament Reflection",
-      content:
-        "We won the regional championship today! The final game was intense - tied until the last quarter when I scored the winning goal. Coach said my defensive positioning has improved significantly. I need to work on my passing accuracy under pressure. The team chemistry is really strong this season, and I'm proud of how we've all developed. This experience has taught me a lot about leadership and performing under pressure - both skills that will be valuable at USAFA.",
-      date: "2023-11-05",
-      category: "Fitness",
-      tags: ["water polo", "competition", "leadership"],
-      mood: "proud",
-    },
-  ]
+  if (percentage >= 97) points = 4.0
+  else if (percentage >= 93) points = 4.0
+  else if (percentage >= 90) points = 3.7
+  else if (percentage >= 87) points = 3.3
+  else if (percentage >= 83) points = 3.0
+  else if (percentage >= 80) points = 2.7
+  else if (percentage >= 77) points = 2.3
+  else if (percentage >= 73) points = 2.0
+  else if (percentage >= 70) points = 1.7
+  else if (percentage >= 67) points = 1.3
+  else if (percentage >= 63) points = 1.0
+  else if (percentage >= 60) points = 0.7
+  else points = 0.0
 
-  // Sample mentors
-  const sampleMentors: Mentor[] = [
-    {
-      id: "1",
-      name: "Col. James Wilson",
-      role: "USAFA Admissions Officer",
-      expertise: ["Admissions", "Leadership", "Military Preparation"],
-      avatar: "/placeholder.svg",
-      contact: "james.wilson@example.com",
-    },
-    {
-      id: "2",
-      name: "Capt. Sarah Johnson",
-      role: "USAFA Graduate",
-      expertise: ["Academics", "Cadet Life", "Physical Training"],
-      avatar: "/placeholder.svg",
-      contact: "sarah.johnson@example.com",
-    },
-    {
-      id: "3",
-      name: "Dr. Michael Chen",
-      role: "Academic Advisor",
-      expertise: ["STEM Subjects", "Research", "Academic Planning"],
-      avatar: "/placeholder.svg",
-      contact: "michael.chen@example.com",
-    },
-  ]
+  // Add AP bonus
+  if (isAP) points = Math.min(4.0, points + 1.0)
 
-  // Sample meeting logs
-  const sampleMeetingLogs: MeetingLog[] = [
-    {
-      id: "1",
-      mentorId: "1",
-      date: "2023-11-05",
-      duration: "45 minutes",
-      topics: "Application strategy, Congressional nomination process",
-      notes:
-        "Col. Wilson advised to start the nomination process early and provided contacts for local representatives.",
-      followUp: "Research congressional nomination requirements and prepare initial application materials.",
-    },
-    {
-      id: "2",
-      mentorId: "2",
-      date: "2023-10-28",
-      duration: "30 minutes",
-      topics: "Physical fitness preparation, CFA requirements",
-      notes: "Capt. Johnson recommended specific training regimen for improving pull-ups and mile run time.",
-      followUp: "Implement new workout plan and track progress weekly.",
-    },
-  ]
-
-  // Sample questions
-  const sampleQuestions: Question[] = [
-    {
-      id: "1",
-      question: "What are the most important factors in a successful USAFA application?",
-      answer:
-        "A successful USAFA application requires excellence in academics (strong GPA and test scores), leadership (demonstrated through extracurricular activities), physical fitness (preparation for the CFA), and character (recommendations and interviews). Additionally, securing a congressional nomination is a critical step in the process.",
-      category: "Admissions",
-      date: "2023-10-20",
-      status: "answered",
-    },
-    {
-      id: "2",
-      question: "How should I prepare for the Candidate Fitness Assessment?",
-      answer:
-        "The CFA consists of six events: basketball throw, pull-ups, shuttle run, modified sit-ups, push-ups, and a one-mile run. Develop a balanced training program that addresses all components, with particular focus on your weaker areas. Aim to exceed the minimum requirements, as higher scores strengthen your application.",
-      category: "Fitness",
-      date: "2023-10-25",
-      status: "answered",
-    },
-    {
-      id: "3",
-      question: "What academic courses should I prioritize in high school?",
-      answer: "",
-      category: "Academics",
-      date: "2023-11-01",
-      status: "pending",
-    },
-  ]
-
-  // Sample exercises
-  const sampleExercises: Exercise[] = [
-    {
-      id: "1",
-      name: "Push-ups",
-      target: 62,
-      current: 45,
-      unit: "reps",
-    },
-    {
-      id: "2",
-      name: "Sit-ups",
-      target: 75,
-      current: 60,
-      unit: "reps",
-    },
-    {
-      id: "3",
-      name: "Pull-ups",
-      target: 12,
-      current: 8,
-      unit: "reps",
-    },
-    {
-      id: "4",
-      name: "1-Mile Run",
-      target: 6.5,
-      current: 7.2,
-      unit: "minutes",
-    },
-    {
-      id: "5",
-      name: "Shuttle Run",
-      target: 8.1,
-      current: 8.6,
-      unit: "seconds",
-    },
-    {
-      id: "6",
-      name: "Basketball Throw",
-      target: 70,
-      current: 62,
-      unit: "feet",
-    },
-  ]
-
-  // Sample goals
-  const sampleGoals: Goal[] = [
-    {
-      id: "1",
-      title: "Complete SAT preparation",
-      category: "Academic",
-      deadline: "2023-12-15",
-      progress: 75,
-      completed: false,
-    },
-    {
-      id: "2",
-      title: "Run 3 miles under 21 minutes",
-      category: "Fitness",
-      deadline: "2023-11-30",
-      progress: 90,
-      completed: false,
-    },
-    {
-      id: "3",
-      title: "Submit congressional nomination",
-      category: "Application",
-      deadline: "2023-10-15",
-      progress: 100,
-      completed: true,
-    },
-    {
-      id: "4",
-      title: "Complete personal statement",
-      category: "Application",
-      deadline: "2023-11-01",
-      progress: 60,
-      completed: false,
-    },
-  ]
-
-  // Add all sample data to the database
-  await db.tasks.bulkAdd(sampleTasks)
-  await db.events.bulkAdd(sampleEvents)
-  await db.journalEntries.bulkAdd(sampleJournalEntries)
-  await db.mentors.bulkAdd(sampleMentors)
-  await db.meetingLogs.bulkAdd(sampleMeetingLogs)
-  await db.questions.bulkAdd(sampleQuestions)
-  await db.exercises.bulkAdd(sampleExercises)
-  await db.goals.bulkAdd(sampleGoals)
+  return points
 }
