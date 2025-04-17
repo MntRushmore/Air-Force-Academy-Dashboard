@@ -16,6 +16,7 @@ import {
   BarChart,
   TrendingUp,
   ChevronLeft,
+  Clock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -84,6 +85,11 @@ const sidebarItems = [
     label: "Grade Prediction",
   },
   {
+    href: "/pomodoro",
+    icon: Clock,
+    label: "Pomodoro",
+  },
+  {
     href: "/settings",
     icon: Settings,
     label: "Settings",
@@ -96,10 +102,11 @@ export function AppSidebar() {
 
   return (
     <>
+      {/* Fixed desktop sidebar */}
       <aside
-        className={`fixed top-0 z-20 h-full bg-background border-r shadow-sm transition-all duration-300 ${
+        className={`fixed top-0 z-30 h-full bg-background border-r shadow-sm transition-all duration-300 ${
           open ? "w-64" : "w-16"
-        } ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
+        } hidden md:block`}
       >
         <div className="flex flex-col h-full">
           <div className="h-16 flex items-center justify-center border-b">
@@ -124,7 +131,7 @@ export function AppSidebar() {
                         } ${open ? "px-3" : "px-0 justify-center"} h-10`}
                         asChild
                       >
-                        <Link href={item.href} onClick={() => setMobileOpen(false)}>
+                        <Link href={item.href}>
                           <div className="flex items-center">
                             <item.icon className={`h-4 w-4 ${open ? "mr-2" : ""}`} />
                             {open && <span>{item.label}</span>}
@@ -151,8 +158,9 @@ export function AppSidebar() {
         </div>
       </aside>
 
+      {/* Mobile sidebar using Sheet component */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-64 p-0">
+        <SheetContent side="left" className="w-64 p-0 z-50">
           <SheetHeader className="h-16 flex items-center justify-start px-4 border-b">
             <SheetTitle>USAFA Prep</SheetTitle>
           </SheetHeader>
