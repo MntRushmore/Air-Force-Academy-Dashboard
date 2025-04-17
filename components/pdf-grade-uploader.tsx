@@ -2,20 +2,13 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { AlertCircle, CheckCircle, FileText, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import { extractGradesFromPDF, importExtractedGrades, type ExtractedGradeData } from "@/lib/pdf-parser"
-
-// Import PDF.js
-import * as pdfjs from "pdfjs-dist"
-
-// Set the PDF.js worker source
-const pdfjsWorker = await import("pdfjs-dist/build/pdf.worker.entry")
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 export function PDFGradeUploader() {
   const [file, setFile] = useState<File | null>(null)
@@ -25,6 +18,28 @@ export function PDFGradeUploader() {
   const [error, setError] = useState<string | null>(null)
   const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [pdfjs, setPdfjs] = useState<any>(null)
+
+  // Dynamically load PDF.js only on the client side
+  useEffect(() => {
+    const loadPdfjs = async () => {
+      try {
+        // Dynamically import PDF.js
+        const pdfJsLib = await import("pdfjs-dist")
+
+        // Set the worker source
+        const pdfJsWorker = await import("pdfjs-dist/build/pdf.worker.mjs")
+        pdfJsLib.GlobalWorkerOptions.workerSrc = pdfJsWorker
+
+        setPdfjs(pdfJsLib)
+      } catch (err) {
+        console.error("Error loading PDF.js:", err)
+        setError("Failed to load PDF processing library. Please try again later.")
+      }
+    }
+
+    loadPdfjs()
+  }, [])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -78,7 +93,12 @@ export function PDFGradeUploader() {
   }
 
   const processFile = async () => {
-    if (!file) return
+    if (!file || !pdfjs) {
+      if (!pdfjs) {
+        setError("PDF processing library is not loaded yet. Please try again in a moment.")
+      }
+      return
+    }
 
     try {
       setIsProcessing(true)
@@ -342,7 +362,9 @@ export function PDFGradeUploader() {
               Cancel
             </Button>
             {!extractedData ? (
-              <Button onClick={processFile}>Process PDF</Button>
+              <Button onClick={processFile} disabled={!pdfjs}>
+                Process PDF
+              </Button>
             ) : (
               <Button onClick={handleImport}>Import Grades</Button>
             )}
