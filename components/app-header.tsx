@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Menu, Search, Shield } from "lucide-react"
+import { Bell, Menu, Search, Shield, ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -16,23 +16,33 @@ import { ModeToggle } from "@/components/mode-toggle"
 import { PWAInstaller } from "@/components/pwa-installer"
 
 export function AppHeader() {
-  const { setMobileOpen } = useSidebar()
+  const { open, setOpen, setMobileOpen } = useSidebar()
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center border-b bg-background px-4 md:px-6">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="mr-2 md:hidden"
-        onClick={() => setMobileOpen(true)}
-        aria-label="Open menu"
-      >
-        <Menu className="h-5 w-5" />
-      </Button>
-
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="mr-2 md:hidden"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hidden md:flex mr-2"
+          onClick={() => setOpen(!open)}
+          aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
+        >
+          <ChevronLeft className={`h-5 w-5 transition-transform ${open ? "" : "rotate-180"}`} />
+        </Button>
+
         <Shield className="h-6 w-6 text-primary" />
-        <span className="font-bold text-lg text-primary">USAFA Prep</span>
+        <span className="font-bold text-lg text-primary hidden sm:inline-block">USAFA Prep</span>
       </div>
 
       <div className="relative flex-1 max-w-md mx-auto md:mx-0 md:ml-6">

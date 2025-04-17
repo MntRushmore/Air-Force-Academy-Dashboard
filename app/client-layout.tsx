@@ -16,16 +16,12 @@ function MainLayout({ children }: { children: React.ReactNode }) {
   const { open } = useSidebar()
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-hidden">
         <AppSidebar />
-        <main
-          className={`flex-1 overflow-x-hidden transition-all duration-300 pt-2 md:pt-4 px-4 md:px-6 pb-8 ${
-            open ? "md:ml-64" : "md:ml-20"
-          }`}
-        >
-          {children}
+        <main className={`flex-1 overflow-auto transition-all duration-300 ${open ? "md:ml-64" : "md:ml-16"}`}>
+          <div className="container mx-auto p-4 md:p-6 max-w-7xl">{children}</div>
         </main>
       </div>
     </div>

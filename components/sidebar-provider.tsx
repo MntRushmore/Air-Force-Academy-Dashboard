@@ -20,15 +20,21 @@ const SidebarContext = createContext<SidebarContextType>({
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
   // Initialize with localStorage value if available, otherwise default to true
-  const [open, setOpen] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sidebarOpen")
-      return saved !== null ? saved === "true" : true
-    }
-    return true
-  })
+  const [open, setOpen] = useState<boolean>(true)
+  const [mobileOpen, setMobileOpen] = useState<boolean>(false)
 
-  const [mobileOpen, setMobileOpen] = useState(false)
+  // Load sidebar state from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedState = localStorage.getItem("sidebarOpen")
+      if (savedState !== null) {
+        setOpen(savedState === "true")
+      } else {
+        // Default to closed on mobile, open on desktop
+        setOpen(window.innerWidth >= 768)
+      }
+    }
+  }, [])
 
   // Save sidebar state to localStorage when it changes
   useEffect(() => {
