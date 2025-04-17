@@ -21,19 +21,33 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { db } from "@/lib/db"
 import { useLiveQuery } from "dexie-react-hooks"
-import { calculateGPA } from "@/lib/grade-analysis"
+import { calculateGPA, formatGPA, shouldDisplayGPA } from "@/lib/grade-utils"
+import { GPADisplay } from "@/components/gpa-display"
 
 // Add imports for fitness and application utilities
 import { calculateCFAScore } from "@/lib/fitness-utils"
 import { calculateApplicationProgress } from "@/lib/application-utils"
 import { useEffect, useState } from "react"
+import { useSupabaseCourses } from "@/hooks/use-supabase-courses"
+import { useSupabaseGrades } from "@/hooks/use-supabase-grades"
 
 export default function Dashboard() {
-  const courses = useLiveQuery(() => db.courses.toArray(), []) || []
-  const grades = useLiveQuery(() => db.grades.toArray(), []) || []
+  // Get courses and grades from Supabase
+  const { courses: supabaseCourses, loading: coursesLoading } = useSupabaseCourses()
+  const { grades: supabaseGrades, loading: gradesLoading } = useSupabaseGrades()
+
+  // Fallback to local database if Supabase data is not available
+  const localCourses = useLiveQuery(() => db.courses.toArray(), []) || []
+  const localGrades = useLiveQuery(() => db.grades.toArray(), []) || []
+
+  // Use Supabase data if available, otherwise use local data
+  const courses = supabaseCourses.length > 0 ? supabaseCourses : localCourses
+  const grades = supabaseGrades.length > 0 ? supabaseGrades : localGrades
+  const isLoading = coursesLoading || gradesLoading
 
   // Calculate GPA using the unified function
   const currentGPA = calculateGPA(courses, grades)
+  const hasCoursesWithGrades = shouldDisplayGPA(courses)
 
   // Calculate fitness score (placeholder for now)
   const exercises = useLiveQuery(() => db.exercises.toArray(), []) || []
@@ -84,18 +98,8 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-gradient-to-br from-[#0033a0] to-[#003db8] text-white shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Current GPA</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{currentGPA.toFixed(2)}</div>
-            <div className="mt-2 flex items-center text-sm">
-              <TrendingUp className="mr-1 h-4 w-4" />
-              <span>{courses.length > 0 ? `Based on ${courses.length} courses` : "Add courses to calculate"}</span>
-            </div>
-          </CardContent>
-        </Card>
+        <GPADisplay courses={courses} grades={grades} gpa={currentGPA} isLoading={isLoading} />
+
         <Card className="bg-gradient-to-br from-[#7d8ca3] to-[#a1afc2] text-white shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Fitness Score</CardTitle>
@@ -269,11 +273,17 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center py-8 text-center">
               <BookOpen className="h-12 w-12 text-[#0033a0] mb-4" />
-              <h3 className="text-lg font-medium">No courses added yet</h3>
-              <p className="text-sm text-muted-foreground mt-1">Add your courses to track your academic progress</p>
+              <h3 className="text-lg font-medium">
+                {hasCoursesWithGrades ? `Current GPA: ${formatGPA(currentGPA)}` : "No courses added yet"}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {hasCoursesWithGrades
+                  ? `You have ${courses.length} courses with grades`
+                  : "Add your courses to track your academic progress"}
+              </p>
               <Button className="mt-4" asChild>
                 <Link href="/courses">
-                  <Plus className="mr-2 h-4 w-4" /> Add Courses
+                  <Plus className="mr-2 h-4 w-4" /> {hasCoursesWithGrades ? "Manage Courses" : "Add Courses"}
                 </Link>
               </Button>
             </CardContent>
