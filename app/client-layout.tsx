@@ -10,6 +10,7 @@ import { AppHeader } from "@/components/app-header"
 import { Toaster } from "@/components/ui/toaster"
 import { useSidebar } from "@/components/sidebar-provider"
 import { getClientId } from "@/lib/supabase-client"
+import { AuthProvider } from "@/components/auth-provider"
 
 // Wrapper component to access sidebar context
 function MainLayout({ children }: { children: React.ReactNode }) {
@@ -36,10 +37,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <SidebarProvider>
-        <MainLayout>{children}</MainLayout>
-        <Toaster />
-      </SidebarProvider>
+      <AuthProvider>
+        <SidebarProvider>
+          <MainLayout>{children}</MainLayout>
+          <Toaster />
+        </SidebarProvider>
+      </AuthProvider>
     </ThemeProvider>
   )
 }

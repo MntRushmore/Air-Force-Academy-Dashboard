@@ -1,9 +1,6 @@
-import { SignUpForm } from "@/components/auth/sign-up-form"
+import { redirect } from "next/navigation"
 
 export default function SignUpPage() {
-  return (
-    <div className="container flex items-center justify-center min-h-screen py-12">
-      <SignUpForm />
-    </div>
-  )
+  // Redirect to home page since we no longer use authentication
+  redirect("/")
 }

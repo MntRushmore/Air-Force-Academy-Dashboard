@@ -1,9 +1,6 @@
-import { SignInForm } from "@/components/auth/sign-in-form"
+import { redirect } from "next/navigation"
 
 export default function SignInPage() {
-  return (
-    <div className="container flex items-center justify-center min-h-screen py-12">
-      <SignInForm />
-    </div>
-  )
+  // Redirect to home page since we no longer use authentication
+  redirect("/")
 }
