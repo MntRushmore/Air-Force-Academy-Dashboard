@@ -2,17 +2,15 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import ClientLayout from "./client-layout"
+import { ThemeProvider } from "@/components/theme-provider"
+import { DataProvider } from "@/lib/data-context"
+import { DataLoading } from "@/components/data-loading"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "USAFA Application Dashboard",
-  description: "Track your journey to the United States Air Force Academy",
-  manifest: "/manifest.json",
-  icons: {
-    apple: "/icons/apple-icon.png",
-  },
+  description: "Track your courses, grades, and schedule",
     generator: 'v0.dev'
 }
 
@@ -23,17 +21,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <meta name="application-name" content="USAFA Application Dashboard" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="USAFA Prep" />
-        <meta name="format-detection" content="telephone=no" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="theme-color" content="#0033a0" />
-      </head>
       <body className={inter.className}>
-        <ClientLayout>{children}</ClientLayout>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <DataProvider>
+            <DataLoading>{children}</DataLoading>
+          </DataProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

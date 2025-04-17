@@ -1,7 +1,7 @@
 "use client"
 
+import { useData } from "@/lib/data-context"
 import { useState } from "react"
-import { useLiveQuery } from "dexie-react-hooks"
 import { Dumbbell, Plus, Target, Trophy, TrendingUp, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { db, type Exercise, addItem, deleteItem, updateItem } from "@/lib/db"
+import { db, type Exercise, addItem } from "@/lib/db"
 import {
   Dialog,
   DialogContent,
@@ -22,30 +22,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { calculateExerciseScore, cfaStandardsMale, cfaStandardsFemale } from "@/lib/fitness-utils"
 
 // CFA standards for males (approximated)
-const cfaStandardsMale = {
-  "Basketball Throw": { min: 60, max: 102, unit: "feet" },
-  "Pull-ups": { min: 7, max: 18, unit: "reps" },
-  "Shuttle Run": { min: 8.1, max: 7.1, unit: "seconds", isReversed: true },
-  Crunches: { min: 58, max: 95, unit: "reps" },
-  "Push-ups": { min: 35, max: 75, unit: "reps" },
-  "1-Mile Run": { min: 7.3, max: 5.2, unit: "minutes", isReversed: true },
-}
-
-// CFA standards for females (approximated)
-const cfaStandardsFemale = {
-  "Basketball Throw": { min: 40, max: 66, unit: "feet" },
-  "Pull-ups": { min: 1, max: 7, unit: "reps" },
-  "Shuttle Run": { min: 9.1, max: 7.8, unit: "seconds", isReversed: true },
-  Crunches: { min: 50, max: 95, unit: "reps" },
-  "Push-ups": { min: 18, max: 41, unit: "reps" },
-  "1-Mile Run": { min: 8.3, max: 6.0, unit: "minutes", isReversed: true },
-}
+// Remove these variables:
+// const cfaStandardsMale = { ... }
+// const cfaStandardsFemale = { ... }
 
 export default function FitnessPage() {
-  const exercises = useLiveQuery(() => db.exercises.toArray(), []) || []
-  const [gender, setGender] = useState<"male" | "female">("male")
+  const { exercises, gender, setGender, cfaScore, updateExercise, removeExercise, addExercise } = useData()
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null)
   const [newExercise, setNewExercise] = useState<Partial<Exercise>>({
     name: "",
@@ -56,56 +41,15 @@ export default function FitnessPage() {
 
   const cfaStandards = gender === "male" ? cfaStandardsMale : cfaStandardsFemale
 
-  const calculateCFAScore = () => {
-    if (exercises.length === 0) return 0
-
-    const cfaExercises = ["Basketball Throw", "Pull-ups", "Shuttle Run", "Crunches", "Push-ups", "1-Mile Run"]
-
-    let totalScore = 0
-    let exerciseCount = 0
-
-    for (const exerciseName of cfaExercises) {
-      const exercise = exercises.find((e) => e.name === exerciseName)
-      if (!exercise) continue
-
-      const standard = cfaStandards[exerciseName as keyof typeof cfaStandards]
-      if (!standard) continue
-
-      let score = 0
-      if (standard.isReversed) {
-        // Lower is better (e.g., run time)
-        if (exercise.current <= standard.max) score = 100
-        else if (exercise.current >= standard.min) score = 0
-        else {
-          score = 100 - ((exercise.current - standard.max) / (standard.min - standard.max)) * 100
-        }
-      } else {
-        // Higher is better (e.g., push-ups)
-        if (exercise.current >= standard.max) score = 100
-        else if (exercise.current <= standard.min) score = 0
-        else {
-          score = ((exercise.current - standard.min) / (standard.max - standard.min)) * 100
-        }
-      }
-
-      totalScore += score
-      exerciseCount++
-    }
-
-    return exerciseCount > 0 ? Math.round(totalScore / exerciseCount) : 0
-  }
-
-  const addExercise = async () => {
+  const handleAddExercise = async () => {
     if (!newExercise.name) return
 
-    const exercise: Exercise = {
+    await addExercise({
       name: newExercise.name,
       target: newExercise.target || 0,
       current: newExercise.current || 0,
       unit: newExercise.unit || "reps",
-    }
-
-    await addItem(db.exercises, exercise)
+    })
 
     setNewExercise({
       name: "",
@@ -115,44 +59,11 @@ export default function FitnessPage() {
     })
   }
 
-  const updateExercise = async (id: string, changes: Partial<Exercise>) => {
-    if (!id) return
-    await updateItem(db.exercises, id, changes)
-  }
-
-  const removeExercise = async (id: string) => {
-    if (!id) return
-    await deleteItem(db.exercises, id)
-    if (selectedExercise && selectedExercise.id === id) {
-      setSelectedExercise(null)
-    }
-  }
-
   const calculateProgress = (exercise: Exercise) => {
-    const standard = cfaStandards[exercise.name as keyof typeof cfaStandards]
-
-    if (!standard) return { percentage: (exercise.current / exercise.target) * 100, score: 0 }
-
-    let score = 0
-    if (standard.isReversed) {
-      // Lower is better (e.g., run time)
-      if (exercise.current <= standard.max) score = 100
-      else if (exercise.current >= standard.min) score = 0
-      else {
-        score = 100 - ((exercise.current - standard.max) / (standard.min - standard.max)) * 100
-      }
-    } else {
-      // Higher is better (e.g., push-ups)
-      if (exercise.current >= standard.max) score = 100
-      else if (exercise.current <= standard.min) score = 0
-      else {
-        score = ((exercise.current - standard.min) / (standard.max - standard.min)) * 100
-      }
-    }
-
+    const score = calculateExerciseScore(exercise.name, exercise.current, gender)
     return {
       percentage: Math.min(100, Math.max(0, (exercise.current / exercise.target) * 100)),
-      score: Math.round(score),
+      score,
     }
   }
 
@@ -169,7 +80,7 @@ export default function FitnessPage() {
             <CardTitle className="text-sm font-medium">CFA Score</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{calculateCFAScore()}/100</div>
+            <div className="text-3xl font-bold">{cfaScore}/100</div>
             <div className="mt-2 flex items-center text-sm">
               <TrendingUp className="mr-1 h-4 w-4" />
               <span>Based on current performance</span>
@@ -326,7 +237,7 @@ export default function FitnessPage() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button onClick={addExercise}>Add Exercise</Button>
+                  <Button onClick={handleAddExercise}>Add Exercise</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

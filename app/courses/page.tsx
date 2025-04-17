@@ -1,19 +1,21 @@
 "use client"
 
+import { CardFooter } from "@/components/ui/card"
+
 import type React from "react"
 import { useState, useEffect } from "react"
 
 import { Book, FileUp, GraduationCap, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { useData } from "@/lib/data-context"
 import { db, type Course, type Grade, addItem, deleteItem, importGradesFromCSV } from "@/lib/db"
-import { useLiveQuery } from "dexie-react-hooks"
 import {
   Dialog,
   DialogContent,
@@ -27,11 +29,16 @@ import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import {
+  calculateCourseGrade,
+  percentageToLetterGrade,
+  percentageToGradePoints,
+  getCourseGradeColor,
+} from "@/lib/gpa-utils"
 
 export default function CoursesPage() {
   // Use Dexie's useLiveQuery hook to get real-time updates from the database
-  const courses = useLiveQuery(() => db.courses.orderBy("year").reverse().toArray(), []) || []
-  const grades = useLiveQuery(() => db.grades.toArray(), []) || []
+  const { courses, grades, gpa } = useData()
 
   const [newCourse, setNewCourse] = useState<Partial<Course>>({
     code: "",
@@ -153,7 +160,7 @@ export default function CoursesPage() {
     }
   }
 
-  const calculateCourseGrade = (courseId: string): { percentage: number; letterGrade: string } => {
+  const calculateCourseGradeOld = (courseId: string): { percentage: number; letterGrade: string } => {
     const courseGrades = grades.filter((g) => g.courseId === courseId)
     if (courseGrades.length === 0) return { percentage: 0, letterGrade: "N/A" }
 
@@ -172,30 +179,6 @@ export default function CoursesPage() {
     return { percentage, letterGrade }
   }
 
-  const percentageToLetterGrade = (percentage: number): string => {
-    if (percentage >= 97) return "A+"
-    if (percentage >= 93) return "A"
-    if (percentage >= 90) return "A-"
-    if (percentage >= 87) return "B+"
-    if (percentage >= 83) return "B"
-    if (percentage >= 80) return "B-"
-    if (percentage >= 77) return "C+"
-    if (percentage >= 73) return "C"
-    if (percentage >= 70) return "C-"
-    if (percentage >= 67) return "D+"
-    if (percentage >= 63) return "D"
-    if (percentage >= 60) return "D-"
-    return "F"
-  }
-
-  const getCourseGradeColor = (percentage: number): string => {
-    if (percentage >= 90) return "text-green-600 dark:text-green-400"
-    if (percentage >= 80) return "text-blue-600 dark:text-blue-400"
-    if (percentage >= 70) return "text-amber-600 dark:text-amber-400"
-    if (percentage >= 60) return "text-orange-600 dark:text-orange-400"
-    return "text-red-600 dark:text-red-400"
-  }
-
   const calculateGPA = (): number => {
     if (courses.length === 0) return 0
 
@@ -207,11 +190,11 @@ export default function CoursesPage() {
       if (!course.id) continue
 
       // Calculate course grade
-      const { percentage } = calculateCourseGrade(course.id)
+      const courseGrade = calculateCourseGrade(course.id, grades)
 
       // Only include courses that have grades
-      if (percentage > 0) {
-        const gradePoints = percentageToGradePoints(percentage, course.isAP)
+      if (courseGrade.percentage > 0) {
+        const gradePoints = percentageToGradePoints(courseGrade.percentage, course.isAP)
         totalPoints += gradePoints * course.credits
         totalCredits += course.credits
         validCourses++
@@ -219,29 +202,6 @@ export default function CoursesPage() {
     }
 
     return totalCredits > 0 ? Number.parseFloat((totalPoints / totalCredits).toFixed(2)) : 0
-  }
-
-  const percentageToGradePoints = (percentage: number, isAP: boolean): number => {
-    let points = 0
-
-    if (percentage >= 97) points = 4.0
-    else if (percentage >= 93) points = 4.0
-    else if (percentage >= 90) points = 3.7
-    else if (percentage >= 87) points = 3.3
-    else if (percentage >= 83) points = 3.0
-    else if (percentage >= 80) points = 2.7
-    else if (percentage >= 77) points = 2.3
-    else if (percentage >= 73) points = 2.0
-    else if (percentage >= 70) points = 1.7
-    else if (percentage >= 67) points = 1.3
-    else if (percentage >= 63) points = 1.0
-    else if (percentage >= 60) points = 0.7
-    else points = 0.0
-
-    // Add AP bonus
-    if (isAP) points = Math.min(4.0, points + 1.0)
-
-    return points
   }
 
   // Group courses by year
@@ -269,7 +229,7 @@ export default function CoursesPage() {
             <CardTitle className="text-sm font-medium">Current GPA</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{calculateGPA()}</div>
+            <div className="text-3xl font-bold">{gpa}</div>
             <div className="mt-1 text-sm opacity-90">
               Based on {courses.length} course{courses.length !== 1 ? "s" : ""}
             </div>
@@ -361,8 +321,8 @@ export default function CoursesPage() {
                     </div>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {yearCourses.map((course) => {
-                        const { percentage, letterGrade } = calculateCourseGrade(course.id || "")
-                        const gradeColor = getCourseGradeColor(percentage)
+                        const courseGrade = calculateCourseGrade(course.id || "", grades)
+                        const gradeColor = getCourseGradeColor(courseGrade.percentage)
 
                         return (
                           <Card
@@ -394,16 +354,18 @@ export default function CoursesPage() {
                                   </CardTitle>
                                   <CardDescription>{course.name}</CardDescription>
                                 </div>
-                                <div className={`text-xl font-bold ${gradeColor}`}>{letterGrade}</div>
+                                <div className={`text-xl font-bold ${gradeColor}`}>{courseGrade.letterGrade}</div>
                               </div>
                             </CardHeader>
                             <CardContent>
                               <div className="space-y-2">
                                 <div className="flex justify-between text-sm">
                                   <span className="text-muted-foreground">Grade:</span>
-                                  <span className={`font-medium ${gradeColor}`}>{percentage.toFixed(1)}%</span>
+                                  <span className={`font-medium ${gradeColor}`}>
+                                    {courseGrade.percentage.toFixed(1)}%
+                                  </span>
                                 </div>
-                                <Progress value={percentage} className="h-2" />
+                                <Progress value={courseGrade.percentage} className="h-2" />
                                 <div className="flex justify-between text-sm">
                                   <span className="text-muted-foreground">Credits:</span>
                                   <span>{course.credits}</span>
@@ -498,18 +460,18 @@ export default function CoursesPage() {
                     <h3 className="text-sm font-medium mb-2">Grade Summary</h3>
                     <div className="space-y-2">
                       {(() => {
-                        const { percentage, letterGrade } = calculateCourseGrade(selectedCourse.id || "")
-                        const gradeColor = getCourseGradeColor(percentage)
+                        const courseGrade = calculateCourseGrade(selectedCourse.id || "", grades)
+                        const gradeColor = getCourseGradeColor(courseGrade.percentage)
 
                         return (
                           <>
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-muted-foreground">Current Grade:</span>
                               <span className={`text-lg font-bold ${gradeColor}`}>
-                                {letterGrade} ({percentage.toFixed(1)}%)
+                                {courseGrade.letterGrade} ({courseGrade.percentage.toFixed(1)}%)
                               </span>
                             </div>
-                            <Progress value={percentage} className="h-2" />
+                            <Progress value={courseGrade.percentage} className="h-2" />
                           </>
                         )
                       })()}
