@@ -295,8 +295,8 @@ export interface Database {
           course_id?: string
           title?: string
           type?: string | null
-          score?: number
-          max_score?: number
+          score?: number | null
+          max_score?: number | null
           weight?: number | null
           date?: string | null
           notes?: string | null
