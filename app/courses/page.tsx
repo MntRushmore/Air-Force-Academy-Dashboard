@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Book, FileUp, GraduationCap, Plus, Trash2 } from "lucide-react"
+import { Book, FileUp, GraduationCap, Plus, Trash2, AlertCircle, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -27,7 +27,8 @@ import {
 } from "@/components/ui/dialog"
 import { useSupabaseCourses } from "@/hooks/use-supabase-courses"
 import { useSupabaseGrades } from "@/hooks/use-supabase-grades"
-import { calculateGPA, calculateCourseGrade, getGradeColor } from "@/lib/grade-utils"
+import { calculateGPA, calculateCourseGrade, getGradeColor, formatGPA } from "@/lib/grade-utils"
+import { SupabaseDiagnostics } from "@/components/supabase-diagnostics"
 import type { Database } from "@/lib/database.types"
 
 type Course = Database["public"]["Tables"]["courses"]["Row"]
@@ -50,8 +51,10 @@ export default function CoursesPage() {
     addCourse,
     updateCourse,
     deleteCourse,
+    fetchCourses,
   } = useSupabaseCourses()
-  const { grades, loading: gradesLoading, error: gradesError, addGrade, deleteGrade } = useSupabaseGrades()
+
+  const { grades, loading: gradesLoading, error: gradesError, addGrade, deleteGrade, fetchGrades } = useSupabaseGrades()
 
   const [newCourse, setNewCourse] = useState<InsertCourse>({
     code: "",
@@ -71,6 +74,7 @@ export default function CoursesPage() {
   const [importStatus, setImportStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [importError, setImportError] = useState("")
   const [yearFilter, setYearFilter] = useState<number | "all">("all")
+  const [showDiagnostics, setShowDiagnostics] = useState(false)
 
   // Reset selected course when courses change
   useEffect(() => {
@@ -83,7 +87,7 @@ export default function CoursesPage() {
   }, [courses, selectedCourse])
 
   // Get unique years from courses
-  const years = [...new Set(courses.map((course) => course.year))].sort((a, b) => b - a)
+  const years = [...new Set(courses.map((course) => course.year || 0))].sort((a, b) => b - a)
 
   // Filter courses by year if a year is selected
   const filteredCourses = yearFilter === "all" ? courses : courses.filter((course) => course.year === yearFilter)
@@ -91,20 +95,25 @@ export default function CoursesPage() {
   const handleAddCourse = async () => {
     if (!newCourse.code || !newCourse.name) return
 
-    await addCourse(newCourse)
+    const result = await addCourse(newCourse)
 
-    // Reset form
-    setNewCourse({
-      code: "",
-      name: "",
-      instructor: "",
-      credits: 3,
-      semester: "Fall",
-      year: new Date().getFullYear(),
-      category: "STEM",
-      is_ap: false,
-      notes: "",
-    })
+    if (result) {
+      // Reset form
+      setNewCourse({
+        code: "",
+        name: "",
+        instructor: "",
+        credits: 3,
+        semester: "Fall",
+        year: new Date().getFullYear(),
+        category: "STEM",
+        is_ap: false,
+        notes: "",
+      })
+
+      // Switch to courses tab
+      setSelectedTab("courses")
+    }
   }
 
   const handleRemoveCourse = async (id: string) => {
@@ -190,6 +199,9 @@ export default function CoursesPage() {
       setImportStatus("success")
       setCsvFile(null)
       setImportError(`Successfully imported ${importCount} grades.`)
+
+      // Refresh grades
+      fetchGrades()
     } catch (error) {
       console.error("Import error:", error)
       setImportStatus("error")
@@ -200,7 +212,7 @@ export default function CoursesPage() {
   }
 
   // Helper function to map grade types
-  function mapGradeType(type: string): Grade["type"] {
+  function mapGradeType(type: string): string {
     type = type.toLowerCase()
     if (type.includes("exam") || type.includes("test")) return "exam"
     if (type.includes("quiz")) return "quiz"
@@ -226,6 +238,11 @@ export default function CoursesPage() {
     },
     {} as Record<number, Course[]>,
   )
+
+  // Handle refresh data
+  const handleRefreshData = async () => {
+    await Promise.all([fetchCourses(), fetchGrades()])
+  }
 
   // Loading state
   if (coursesLoading || gradesLoading) {
@@ -256,13 +273,27 @@ export default function CoursesPage() {
   if (coursesError || gradesError) {
     return (
       <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Academic Courses</h1>
+          <p className="text-muted-foreground">There was an error loading your course data</p>
+        </div>
+
         <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error loading data</AlertTitle>
           <AlertDescription>
             {coursesError?.message || gradesError?.message || "An error occurred while loading your course data."}
           </AlertDescription>
         </Alert>
-        <Button onClick={() => window.location.reload()}>Retry</Button>
+
+        <div className="flex gap-4">
+          <Button onClick={() => window.location.reload()}>Reload Page</Button>
+          <Button variant="outline" onClick={() => setShowDiagnostics(true)}>
+            Run Diagnostics
+          </Button>
+        </div>
+
+        {showDiagnostics && <SupabaseDiagnostics />}
       </div>
     )
   }
@@ -270,7 +301,13 @@ export default function CoursesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Academic Courses</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold tracking-tight">Academic Courses</h1>
+          <Button variant="outline" size="sm" onClick={handleRefreshData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh Data
+          </Button>
+        </div>
         <p className="text-muted-foreground">Manage your courses, track grades, and calculate GPA</p>
       </div>
 
@@ -280,7 +317,7 @@ export default function CoursesPage() {
             <CardTitle className="text-sm font-medium">Current GPA</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{currentGPA.toFixed(2)}</div>
+            <div className="text-3xl font-bold">{formatGPA(currentGPA)}</div>
             <div className="mt-1 text-sm opacity-90">
               Based on {courses.length} course{courses.length !== 1 ? "s" : ""}
             </div>
@@ -328,6 +365,7 @@ export default function CoursesPage() {
           <TabsTrigger value="courses">Courses</TabsTrigger>
           <TabsTrigger value="new">Add Course</TabsTrigger>
           {selectedCourse && <TabsTrigger value="grades">Grades for {selectedCourse.code}</TabsTrigger>}
+          <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="courses" className="space-y-4">
@@ -372,7 +410,7 @@ export default function CoursesPage() {
                     </div>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {yearCourses.map((course) => {
-                        const { percentage, letterGrade } = calculateCourseGrade(course.id, grades)
+                        const { percentage, letterGrade } = calculateCourseGrade(course.id || "", grades)
                         const gradeColor = getGradeColor(percentage)
 
                         return (
@@ -509,7 +547,7 @@ export default function CoursesPage() {
                     <h3 className="text-sm font-medium mb-2">Grade Summary</h3>
                     <div className="space-y-2">
                       {(() => {
-                        const { percentage, letterGrade } = calculateCourseGrade(selectedCourse.id, grades)
+                        const { percentage, letterGrade } = calculateCourseGrade(selectedCourse.id || "", grades)
                         const gradeColor = getGradeColor(percentage)
 
                         return (
@@ -751,7 +789,7 @@ export default function CoursesPage() {
                         <DialogTitle>Add New Grade</DialogTitle>
                         <DialogDescription>Enter grade details for {selectedCourse.name}</DialogDescription>
                       </DialogHeader>
-                      <AddGradeForm courseId={selectedCourse.id} onAddGrade={addGrade} />
+                      <AddGradeForm courseId={selectedCourse.id || ""} onAddGrade={addGrade} />
                     </DialogContent>
                   </Dialog>
                 </div>
@@ -825,6 +863,10 @@ export default function CoursesPage() {
             </Card>
           </TabsContent>
         )}
+
+        <TabsContent value="diagnostics" className="space-y-4">
+          <SupabaseDiagnostics />
+        </TabsContent>
       </Tabs>
     </div>
   )

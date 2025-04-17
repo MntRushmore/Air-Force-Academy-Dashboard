@@ -5,12 +5,15 @@ type Grade = Database["public"]["Tables"]["grades"]["Row"]
 
 // Calculate GPA based on courses and grades
 export function calculateGPA(courses: Course[], grades: Grade[]): number {
-  if (courses.length === 0) return 0
+  if (!courses || courses.length === 0) return 0
 
   let totalPoints = 0
   let totalCredits = 0
 
   for (const course of courses) {
+    // Skip courses without an ID
+    if (!course.id) continue
+
     // Calculate course grade
     const courseGrades = grades.filter((g) => g.course_id === course.id)
     if (courseGrades.length === 0) continue
@@ -19,6 +22,8 @@ export function calculateGPA(courses: Course[], grades: Grade[]): number {
     let weightSum = 0
 
     for (const grade of courseGrades) {
+      if (grade.score === null || grade.max_score === null || grade.max_score === 0) continue
+
       const percentage = (grade.score / grade.max_score) * 100
       weightedSum += percentage * (grade.weight || 1)
       weightSum += grade.weight || 1
@@ -31,7 +36,7 @@ export function calculateGPA(courses: Course[], grades: Grade[]): number {
     totalCredits += course.credits || 3
   }
 
-  return totalCredits > 0 ? totalPoints / totalCredits : 0
+  return totalCredits > 0 ? Number((totalPoints / totalCredits).toFixed(2)) : 0
 }
 
 // Convert percentage to letter grade
@@ -77,6 +82,8 @@ export function percentageToGradePoints(percentage: number, isAP: boolean): numb
 
 // Calculate course grade
 export function calculateCourseGrade(courseId: string, grades: Grade[]): { percentage: number; letterGrade: string } {
+  if (!courseId || !grades) return { percentage: 0, letterGrade: "N/A" }
+
   const courseGrades = grades.filter((g) => g.course_id === courseId)
   if (courseGrades.length === 0) return { percentage: 0, letterGrade: "N/A" }
 
@@ -84,6 +91,8 @@ export function calculateCourseGrade(courseId: string, grades: Grade[]): { perce
   let weightSum = 0
 
   for (const grade of courseGrades) {
+    if (grade.score === null || grade.max_score === null || grade.max_score === 0) continue
+
     const percentage = (grade.score / grade.max_score) * 100
     weightedSum += percentage * (grade.weight || 1)
     weightSum += grade.weight || 1
@@ -102,4 +111,9 @@ export function getGradeColor(percentage: number): string {
   if (percentage >= 70) return "text-amber-600 dark:text-amber-400"
   if (percentage >= 60) return "text-orange-600 dark:text-orange-400"
   return "text-red-600 dark:text-red-400"
+}
+
+// Format GPA to 2 decimal places
+export function formatGPA(gpa: number): string {
+  return gpa.toFixed(2)
 }
