@@ -14,6 +14,7 @@ import {
   Settings,
   Target,
   User,
+  BarChart,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -71,6 +72,11 @@ const sidebarItems = [
     href: "/report-card",
     icon: CheckCircle2,
     label: "Report Card",
+  },
+  {
+    href: "/grade-comparison",
+    icon: BarChart,
+    label: "Grade Analysis",
   },
   {
     href: "/settings",
