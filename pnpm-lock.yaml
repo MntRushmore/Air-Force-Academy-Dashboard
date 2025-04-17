@@ -128,9 +128,6 @@ importers:
       ical:
         specifier: latest
         version: 0.8.0
-      idb:
-        specifier: latest
-        version: 8.0.2
       input-otp:
         specifier: 1.4.1
         version: 1.4.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -1488,9 +1485,6 @@ packages:
 
   ical@0.8.0:
     resolution: {integrity: sha512-/viUSb/RGLLnlgm0lWRlPBtVeQguQRErSPYl3ugnUaKUnzQswKqOG3M8/P1v1AB5NJwlHTuvTq1cs4mpeG2rCg==}
-
-  idb@8.0.2:
-    resolution: {integrity: sha512-CX70rYhx7GDDQzwwQMDwF6kDRQi5vVs6khHUumDrMecBylKkwvZ8HWvKV08AGb7VbpoGCWUQ4aHzNDgoUiOIUg==}
 
   inherits@2.0.3:
     resolution: {integrity: sha512-x00IRNXNy63jwGkJmzPigoySHbaqpNuzKbBOmzK+g2OdZpQ9w+sxCN+VSB3ja7IAge2OP2qpfxTjeNcyjmW1uw==}
@@ -3378,8 +3372,6 @@ snapshots:
   ical@0.8.0:
     dependencies:
       rrule: 2.4.1
-
-  idb@8.0.2: {}
 
   inherits@2.0.3: {}
 

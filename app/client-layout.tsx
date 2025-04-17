@@ -8,10 +8,8 @@ import { SidebarProvider } from "@/components/sidebar-provider"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
 import { Toaster } from "@/components/ui/toaster"
-import { db } from "@/lib/db"
 import { useSidebar } from "@/components/sidebar-provider"
-import { AuthProvider } from "@/components/auth-provider"
-import { RouteGuard } from "@/components/auth/route-guard"
+import { getClientId } from "@/lib/supabase-client"
 
 // Wrapper component to access sidebar context
 function MainLayout({ children }: { children: React.ReactNode }) {
@@ -32,31 +30,16 @@ function MainLayout({ children }: { children: React.ReactNode }) {
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // Initialize empty database if needed
-    const initializeDb = async () => {
-      try {
-        const courseCount = await db.courses.count()
-        if (courseCount === 0) {
-          console.log("Database is ready")
-        }
-      } catch (error) {
-        console.error("Error initializing database:", error)
-      }
-    }
-
-    initializeDb()
+    // Initialize client ID
+    getClientId()
   }, [])
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <AuthProvider>
-        <RouteGuard>
-          <SidebarProvider>
-            <MainLayout>{children}</MainLayout>
-            <Toaster />
-          </SidebarProvider>
-        </RouteGuard>
-      </AuthProvider>
+      <SidebarProvider>
+        <MainLayout>{children}</MainLayout>
+        <Toaster />
+      </SidebarProvider>
     </ThemeProvider>
   )
 }

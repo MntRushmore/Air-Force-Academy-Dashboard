@@ -1,14 +1,42 @@
-import { openDB as _openDB } from "idb"
 import Dexie, { type Table } from "dexie"
 
+// Add back the openDB function that was missing
 export const openDB = async () => {
-  return await _openDB("usafaPrep", 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains("settings")) {
-        db.createObjectStore("settings")
+  // This is a compatibility function to maintain the API
+  // It returns the db instance directly now instead of using idb's openDB
+  return {
+    transaction: async (storeName: string, mode: "readonly" | "readwrite") => {
+      return {
+        objectStore: (name: string) => {
+          // Simple mapping to Dexie tables
+          const tableMap: Record<string, Table> = {
+            settings: db.settings,
+          }
+          return tableMap[name]
+        },
       }
     },
-  })
+    objectStoreNames: {
+      contains: (name: string) =>
+        [
+          "settings",
+          "tasks",
+          "events",
+          "journalEntries",
+          "meetingLogs",
+          "mentors",
+          "questions",
+          "exercises",
+          "goals",
+          "courses",
+          "grades",
+        ].includes(name),
+    },
+    createObjectStore: (name: string) => {
+      console.log(`Creating object store ${name} (compatibility mode)`)
+      return null
+    },
+  }
 }
 
 // Define types for our database tables

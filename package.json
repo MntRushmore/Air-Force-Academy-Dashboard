@@ -63,7 +63,6 @@
     "dexie-react-hooks": "latest",
     "uuid": "latest",
     "ical": "latest",
-    "idb": "latest",
     "jspdf-autotable": "latest",
     "@supabase/supabase-js": "latest",
     "child_process": "latest",

@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "./supabase"
+import { getPublicSupabaseClient, getClientId } from "./supabase-public"
 import type { Database } from "./database.types"
 
 // Generic type for all tables
@@ -19,9 +19,15 @@ export async function getItems<T extends TableName>(
     limit?: number
   },
 ): Promise<Row<T>[]> {
-  const supabase = getSupabaseClient()
+  const supabase = getPublicSupabaseClient()
+  const clientId = getClientId()
 
   let query = supabase.from(table).select(options?.columns || "*")
+
+  // Filter by client_id instead of user_id
+  if (clientId) {
+    query = query.eq("client_id", clientId)
+  }
 
   if (options?.filter) {
     Object.entries(options.filter).forEach(([key, value]) => {
@@ -54,13 +60,20 @@ export async function getItemById<T extends TableName>(
     columns?: string
   },
 ): Promise<Row<T> | null> {
-  const supabase = getSupabaseClient()
+  const supabase = getPublicSupabaseClient()
+  const clientId = getClientId()
 
-  const { data, error } = await supabase
+  let query = supabase
     .from(table)
     .select(options?.columns || "*")
     .eq("id", id)
-    .single()
+
+  // Add client_id filter for security
+  if (clientId) {
+    query = query.eq("client_id", clientId)
+  }
+
+  const { data, error } = await query.single()
 
   if (error) {
     if (error.code === "PGRST116") {
@@ -76,11 +89,22 @@ export async function getItemById<T extends TableName>(
 
 export async function addItem<T extends TableName>(
   table: T,
-  item: Omit<Insert<T>, "id" | "created_at" | "updated_at">,
+  item: Omit<Insert<T>, "id" | "created_at" | "updated_at" | "client_id">,
 ): Promise<Row<T>> {
-  const supabase = getSupabaseClient()
+  const supabase = getPublicSupabaseClient()
+  const clientId = getClientId()
 
-  const { data, error } = await supabase.from(table).insert(item).select().single()
+  if (!clientId) {
+    throw new Error("Client ID not available")
+  }
+
+  // Add client_id to the item
+  const itemWithClientId = {
+    ...item,
+    client_id: clientId,
+  } as Insert<T>
+
+  const { data, error } = await supabase.from(table).insert(itemWithClientId).select().single()
 
   if (error) {
     console.error(`Error adding item to ${table}:`, error)
@@ -93,14 +117,20 @@ export async function addItem<T extends TableName>(
 export async function updateItem<T extends TableName>(
   table: T,
   id: string,
-  updates: Omit<Update<T>, "id" | "created_at" | "updated_at">,
+  updates: Omit<Update<T>, "id" | "created_at" | "updated_at" | "client_id">,
 ): Promise<Row<T>> {
-  const supabase = getSupabaseClient()
+  const supabase = getPublicSupabaseClient()
+  const clientId = getClientId()
+
+  if (!clientId) {
+    throw new Error("Client ID not available")
+  }
 
   const { data, error } = await supabase
     .from(table)
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
+    .eq("client_id", clientId) // Ensure we only update our own data
     .select()
     .single()
 
@@ -113,9 +143,14 @@ export async function updateItem<T extends TableName>(
 }
 
 export async function deleteItem<T extends TableName>(table: T, id: string): Promise<void> {
-  const supabase = getSupabaseClient()
+  const supabase = getPublicSupabaseClient()
+  const clientId = getClientId()
 
-  const { error } = await supabase.from(table).delete().eq("id", id)
+  if (!clientId) {
+    throw new Error("Client ID not available")
+  }
+
+  const { error } = await supabase.from(table).delete().eq("id", id).eq("client_id", clientId) // Ensure we only delete our own data
 
   if (error) {
     console.error(`Error deleting item from ${table}:`, error)
@@ -123,44 +158,70 @@ export async function deleteItem<T extends TableName>(table: T, id: string): Pro
   }
 }
 
-// Specific helpers for common operations
-export async function getUserProfile() {
-  const supabase = getSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+// Get dashboard settings
+export async function getDashboardSettings() {
+  const supabase = getPublicSupabaseClient()
+  const clientId = getClientId()
 
-  if (!user) return null
-
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-
-  if (error) {
-    console.error("Error fetching user profile:", error)
+  if (!clientId) {
     return null
   }
 
-  return data
-}
-
-export async function updateUserProfile(updates: Partial<Tables["profiles"]["Update"]>) {
-  const supabase = getSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) throw new Error("User not authenticated")
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq("id", user.id)
-    .select()
-    .single()
+  const { data, error } = await supabase.from("settings").select("*").eq("client_id", clientId)
 
   if (error) {
-    console.error("Error updating user profile:", error)
-    throw error
+    console.error("Error fetching settings:", error)
+    return null
   }
 
-  return data
+  // Convert array of settings to an object
+  const settingsObject: Record<string, any> = {}
+  data.forEach((setting) => {
+    settingsObject[setting.key] = setting.value
+  })
+
+  return settingsObject
+}
+
+// Update dashboard settings
+export async function updateDashboardSettings(key: string, value: any) {
+  const supabase = getPublicSupabaseClient()
+  const clientId = getClientId()
+
+  if (!clientId) {
+    throw new Error("Client ID not available")
+  }
+
+  // Check if setting already exists
+  const { data: existingSetting } = await supabase
+    .from("settings")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("key", key)
+    .single()
+
+  if (existingSetting) {
+    // Update existing setting
+    const { error } = await supabase
+      .from("settings")
+      .update({ value, updated_at: new Date().toISOString() })
+      .eq("id", existingSetting.id)
+
+    if (error) {
+      console.error("Error updating setting:", error)
+      throw error
+    }
+  } else {
+    // Create new setting
+    const { error } = await supabase.from("settings").insert({
+      client_id: clientId,
+      key,
+      value,
+    })
+
+    if (error) {
+      console.error("Error creating setting:", error)
+      throw error
+    }
+  }
 }

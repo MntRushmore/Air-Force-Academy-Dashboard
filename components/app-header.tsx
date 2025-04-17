@@ -14,7 +14,6 @@ import {
 import { useSidebar } from "@/components/sidebar-provider"
 import { ModeToggle } from "@/components/mode-toggle"
 import { PWAInstaller } from "@/components/pwa-installer"
-import { UserMenu } from "@/components/user-menu"
 
 export function AppHeader() {
   const { open, setOpen, setMobileOpen } = useSidebar()
@@ -73,7 +72,6 @@ export function AppHeader() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <UserMenu />
       </div>
     </header>
   )
