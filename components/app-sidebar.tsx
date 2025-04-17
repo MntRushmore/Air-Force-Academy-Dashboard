@@ -92,30 +92,30 @@ export function AppSidebar() {
     <>
       <aside
         className={cn(
-          "fixed left-0 top-0 z-20 h-full w-64 border-r bg-background transition-all duration-300 ease-in-out",
+          "fixed left-0 top-16 z-20 h-[calc(100vh-4rem)] w-64 border-r bg-background transition-all duration-300 ease-in-out",
           open ? "translate-x-0" : "-translate-x-full md:translate-x-0 md:w-20",
         )}
       >
-        <div className="flex h-16 items-center justify-between px-4">
+        <div className="flex h-16 items-center justify-between px-4 border-b md:hidden">
           <Link href="/" className="flex items-center gap-2">
             {open ? (
               <div className="flex items-center gap-2">
-                <div className="rounded-md bg-[#0033a0] p-1">
-                  <Shield className="h-6 w-6 text-white" />
+                <div className="rounded-md bg-primary p-1">
+                  <Shield className="h-6 w-6 text-primary-foreground" />
                 </div>
                 <span className="text-lg font-bold">USAFA Prep</span>
               </div>
             ) : (
-              <div className="rounded-md bg-[#0033a0] p-1 mx-auto">
-                <Shield className="h-6 w-6 text-white" />
+              <div className="rounded-md bg-primary p-1 mx-auto">
+                <Shield className="h-6 w-6 text-primary-foreground" />
               </div>
             )}
           </Link>
-          <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(!open)}>
             {open ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
-        <ScrollArea className="h-[calc(100vh-4rem)] pb-10">
+        <ScrollArea className="h-[calc(100vh-8rem)] md:h-[calc(100vh-4rem)] pb-10">
           <div className="px-3 py-2">
             <div className="space-y-1">
               {navItems.map((item) => (
@@ -124,7 +124,7 @@ export function AppSidebar() {
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent",
-                    pathname === item.href ? "bg-[#0033a0] text-white" : "text-muted-foreground",
+                    pathname === item.href ? "bg-primary text-primary-foreground" : "text-muted-foreground",
                     !open && "justify-center",
                   )}
                 >
@@ -135,6 +135,11 @@ export function AppSidebar() {
             </div>
           </div>
         </ScrollArea>
+        <div className="absolute bottom-4 left-0 right-0 px-3 hidden md:block">
+          <Button variant="ghost" size="icon" className="w-full flex justify-center" onClick={() => setOpen(!open)}>
+            {open ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+        </div>
       </aside>
 
       {/* Mobile Sidebar */}
@@ -142,8 +147,8 @@ export function AppSidebar() {
         <SheetContent side="left" className="p-0 w-64">
           <div className="flex h-16 items-center justify-between px-4 border-b">
             <Link href="/" className="flex items-center gap-2">
-              <div className="rounded-md bg-[#0033a0] p-1">
-                <Shield className="h-6 w-6 text-white" />
+              <div className="rounded-md bg-primary p-1">
+                <Shield className="h-6 w-6 text-primary-foreground" />
               </div>
               <span className="text-lg font-bold">USAFA Prep</span>
             </Link>
@@ -161,7 +166,7 @@ export function AppSidebar() {
                     onClick={() => setMobileOpen(false)}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent",
-                      pathname === item.href ? "bg-[#0033a0] text-white" : "text-muted-foreground",
+                      pathname === item.href ? "bg-primary text-primary-foreground" : "text-muted-foreground",
                     )}
                   >
                     <item.icon className="h-5 w-5" />
