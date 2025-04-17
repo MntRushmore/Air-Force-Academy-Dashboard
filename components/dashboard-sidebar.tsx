@@ -3,24 +3,7 @@
 import type * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  BookOpen,
-  Calendar,
-  FileText,
-  GraduationCap,
-  Home,
-  Settings,
-  User,
-  Clock,
-  BarChart,
-  BookMarked,
-  Dumbbell,
-  Target,
-  PenTool,
-  Clock3,
-  LineChart,
-  LayoutDashboard,
-} from "lucide-react"
+import { BookOpen, Calendar, FileText, GraduationCap, Home, LayoutDashboard, Settings, User } from "lucide-react"
 
 import {
   Sidebar,
@@ -58,59 +41,14 @@ const navigationItems = [
     icon: GraduationCap,
   },
   {
-    title: "Report Card",
-    href: "/report-card",
+    title: "Reports",
+    href: "/reports",
     icon: FileText,
   },
   {
-    title: "Grade Comparison",
-    href: "/grade-comparison",
-    icon: BarChart,
-  },
-  {
-    title: "Grade Prediction",
-    href: "/grade-prediction",
-    icon: LineChart,
-  },
-  {
-    title: "Study",
-    href: "/study",
-    icon: BookMarked,
-  },
-  {
-    title: "Fitness",
-    href: "/fitness",
-    icon: Dumbbell,
-  },
-  {
-    title: "Goals",
-    href: "/goals",
-    icon: Target,
-  },
-  {
-    title: "Journal",
-    href: "/journal",
-    icon: PenTool,
-  },
-  {
-    title: "Pomodoro",
-    href: "/pomodoro",
-    icon: Clock,
-  },
-  {
-    title: "Timeline",
-    href: "/timeline",
-    icon: Clock3,
-  },
-  {
-    title: "Mentorship",
-    href: "/mentorship",
+    title: "Profile",
+    href: "/profile",
     icon: User,
-  },
-  {
-    title: "Progress",
-    href: "/progress",
-    icon: BarChart,
   },
   {
     title: "Settings",
@@ -121,13 +59,10 @@ const navigationItems = [
 
 export function DashboardSidebar({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarProvider defaultState="open">
+    <SidebarProvider>
       <div className="flex min-h-screen">
         <AppSidebar />
-        <div className="flex flex-1 flex-col">
-          <DashboardHeader />
-          <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
-        </div>
+        <main className="flex-1 overflow-hidden">{children}</main>
       </div>
     </SidebarProvider>
   )
