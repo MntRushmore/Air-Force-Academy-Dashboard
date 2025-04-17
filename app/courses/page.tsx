@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
 
+import { useState, useEffect } from "react"
 import { Book, FileUp, GraduationCap, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { db, type Course, type Grade, addItem, deleteItem, importGradesFromCSV } from "@/lib/db"
-import { useLiveQuery } from "dexie-react-hooks"
+import { Progress } from "@/components/ui/progress"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -23,18 +25,35 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Progress } from "@/components/ui/progress"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { calculateGPA, percentageToLetterGrade } from "@/lib/grade-analysis"
+import { useSupabaseCourses } from "@/hooks/use-supabase-courses"
+import { useSupabaseGrades } from "@/hooks/use-supabase-grades"
+import { calculateGPA, calculateCourseGrade, getGradeColor } from "@/lib/grade-utils"
+import type { Database } from "@/lib/database.types"
+
+type Course = Database["public"]["Tables"]["courses"]["Row"]
+type Grade = Database["public"]["Tables"]["grades"]["Row"]
+type InsertCourse = Omit<
+  Database["public"]["Tables"]["courses"]["Insert"],
+  "id" | "client_id" | "created_at" | "updated_at"
+>
+type InsertGrade = Omit<
+  Database["public"]["Tables"]["grades"]["Insert"],
+  "id" | "client_id" | "created_at" | "updated_at"
+>
 
 export default function CoursesPage() {
-  // Use Dexie's useLiveQuery hook to get real-time updates from the database
-  const courses = useLiveQuery(() => db.courses.orderBy("year").reverse().toArray(), []) || []
-  const grades = useLiveQuery(() => db.grades.toArray(), []) || []
+  // Use our custom hooks for Supabase data
+  const {
+    courses,
+    loading: coursesLoading,
+    error: coursesError,
+    addCourse,
+    updateCourse,
+    deleteCourse,
+  } = useSupabaseCourses()
+  const { grades, loading: gradesLoading, error: gradesError, addGrade, deleteGrade } = useSupabaseGrades()
 
-  const [newCourse, setNewCourse] = useState<Partial<Course>>({
+  const [newCourse, setNewCourse] = useState<InsertCourse>({
     code: "",
     name: "",
     instructor: "",
@@ -42,7 +61,7 @@ export default function CoursesPage() {
     semester: "Fall",
     year: new Date().getFullYear(),
     category: "STEM",
-    isAP: false,
+    is_ap: false,
     notes: "",
   })
 
@@ -69,23 +88,10 @@ export default function CoursesPage() {
   // Filter courses by year if a year is selected
   const filteredCourses = yearFilter === "all" ? courses : courses.filter((course) => course.year === yearFilter)
 
-  const addCourse = async () => {
+  const handleAddCourse = async () => {
     if (!newCourse.code || !newCourse.name) return
 
-    const course: Course = {
-      code: newCourse.code,
-      name: newCourse.name,
-      instructor: newCourse.instructor || "",
-      credits: newCourse.credits || 3,
-      semester: newCourse.semester || "Fall",
-      year: newCourse.year || new Date().getFullYear(),
-      category: newCourse.category || "STEM",
-      isAP: newCourse.isAP || false,
-      notes: newCourse.notes || "",
-    }
-
-    // Add to database
-    await addItem(db.courses, course)
+    await addCourse(newCourse)
 
     // Reset form
     setNewCourse({
@@ -96,12 +102,12 @@ export default function CoursesPage() {
       semester: "Fall",
       year: new Date().getFullYear(),
       category: "STEM",
-      isAP: false,
+      is_ap: false,
       notes: "",
     })
   }
 
-  const removeCourse = async (id: string) => {
+  const handleRemoveCourse = async (id: string) => {
     if (!id) return
 
     // Confirm before deleting
@@ -113,13 +119,8 @@ export default function CoursesPage() {
       return
     }
 
-    // Also delete all grades associated with this course
-    const courseGrades = grades.filter((grade) => grade.courseId === id)
-    for (const grade of courseGrades) {
-      if (grade.id) await deleteItem(db.grades, grade.id)
-    }
-
-    await deleteItem(db.courses, id)
+    // Delete the course (grades will be handled by the database's foreign key constraints)
+    await deleteCourse(id)
 
     if (selectedCourse && selectedCourse.id === id) {
       setSelectedCourse(null)
@@ -140,11 +141,55 @@ export default function CoursesPage() {
 
     try {
       const text = await csvFile.text()
-      const result = await importGradesFromCSV(selectedCourse.id, text)
+      const lines = text.split("\n")
+      const headers = lines[0].split(",")
+
+      // Find indices for required columns
+      const titleIndex = headers.findIndex((h) => h.toLowerCase().includes("title") || h.toLowerCase().includes("name"))
+      const typeIndex = headers.findIndex(
+        (h) => h.toLowerCase().includes("type") || h.toLowerCase().includes("category"),
+      )
+      const scoreIndex = headers.findIndex(
+        (h) => h.toLowerCase().includes("score") || h.toLowerCase().includes("points"),
+      )
+      const maxScoreIndex = headers.findIndex(
+        (h) => h.toLowerCase().includes("max") || h.toLowerCase().includes("total"),
+      )
+      const weightIndex = headers.findIndex(
+        (h) => h.toLowerCase().includes("weight") || h.toLowerCase().includes("percent"),
+      )
+      const dateIndex = headers.findIndex((h) => h.toLowerCase().includes("date"))
+
+      // Validate required columns
+      if (titleIndex === -1 || scoreIndex === -1) {
+        throw new Error("CSV must contain at least 'title/name' and 'score' columns")
+      }
+
+      // Process data rows
+      let importCount = 0
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue
+
+        const values = lines[i].split(",")
+
+        const grade: InsertGrade = {
+          course_id: selectedCourse.id,
+          title: values[titleIndex].trim(),
+          type: typeIndex !== -1 ? mapGradeType(values[typeIndex].trim()) : "other",
+          score: Number.parseFloat(values[scoreIndex].trim()),
+          max_score: maxScoreIndex !== -1 ? Number.parseFloat(values[maxScoreIndex].trim()) : 100,
+          weight: weightIndex !== -1 ? Number.parseFloat(values[weightIndex].trim()) : 1,
+          date: dateIndex !== -1 ? values[dateIndex].trim() : new Date().toISOString().split("T")[0],
+          notes: "",
+        }
+
+        await addGrade(grade)
+        importCount++
+      }
+
       setImportStatus("success")
       setCsvFile(null)
-      // Show how many grades were imported
-      setImportError(`Successfully imported ${result.count} grades.`)
+      setImportError(`Successfully imported ${importCount} grades.`)
     } catch (error) {
       console.error("Import error:", error)
       setImportStatus("error")
@@ -154,31 +199,16 @@ export default function CoursesPage() {
     }
   }
 
-  const calculateCourseGrade = (courseId: string): { percentage: number; letterGrade: string } => {
-    const courseGrades = grades.filter((g) => g.courseId === courseId)
-    if (courseGrades.length === 0) return { percentage: 0, letterGrade: "N/A" }
-
-    let weightedSum = 0
-    let weightSum = 0
-
-    for (const grade of courseGrades) {
-      const percentage = (grade.score / grade.maxScore) * 100
-      weightedSum += percentage * grade.weight
-      weightSum += grade.weight
-    }
-
-    const percentage = weightSum > 0 ? weightedSum / weightSum : 0
-    const letterGrade = percentageToLetterGrade(percentage)
-
-    return { percentage, letterGrade }
-  }
-
-  const getCourseGradeColor = (percentage: number): string => {
-    if (percentage >= 90) return "text-green-600 dark:text-green-400"
-    if (percentage >= 80) return "text-blue-600 dark:text-blue-400"
-    if (percentage >= 70) return "text-amber-600 dark:text-amber-400"
-    if (percentage >= 60) return "text-orange-600 dark:text-orange-400"
-    return "text-red-600 dark:text-red-400"
+  // Helper function to map grade types
+  function mapGradeType(type: string): Grade["type"] {
+    type = type.toLowerCase()
+    if (type.includes("exam") || type.includes("test")) return "exam"
+    if (type.includes("quiz")) return "quiz"
+    if (type.includes("homework") || type.includes("hw")) return "homework"
+    if (type.includes("project")) return "project"
+    if (type.includes("paper") || type.includes("essay")) return "paper"
+    if (type.includes("participation")) return "participation"
+    return "other"
   }
 
   // Use the unified GPA calculation function
@@ -187,14 +217,55 @@ export default function CoursesPage() {
   // Group courses by year
   const coursesByYear = filteredCourses.reduce(
     (acc, course) => {
-      if (!acc[course.year]) {
-        acc[course.year] = []
+      const year = course.year || 0
+      if (!acc[year]) {
+        acc[year] = []
       }
-      acc[course.year].push(course)
+      acc[year].push(course)
       return acc
     },
     {} as Record<number, Course[]>,
   )
+
+  // Loading state
+  if (coursesLoading || gradesLoading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Academic Courses</h1>
+          <p className="text-muted-foreground">Loading course data...</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="pb-2">
+                <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mt-2"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (coursesError || gradesError) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Alert variant="destructive">
+          <AlertTitle>Error loading data</AlertTitle>
+          <AlertDescription>
+            {coursesError?.message || gradesError?.message || "An error occurred while loading your course data."}
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => window.location.reload()}>Retry</Button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -209,7 +280,7 @@ export default function CoursesPage() {
             <CardTitle className="text-sm font-medium">Current GPA</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{currentGPA}</div>
+            <div className="text-3xl font-bold">{currentGPA.toFixed(2)}</div>
             <div className="mt-1 text-sm opacity-90">
               Based on {courses.length} course{courses.length !== 1 ? "s" : ""}
             </div>
@@ -221,9 +292,9 @@ export default function CoursesPage() {
             <CardTitle className="text-sm font-medium">AP Courses</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{courses.filter((c) => c.isAP).length}</div>
+            <div className="text-3xl font-bold">{courses.filter((c) => c.is_ap).length}</div>
             <div className="mt-1 text-sm opacity-90">
-              {((courses.filter((c) => c.isAP).length / Math.max(courses.length, 1)) * 100).toFixed(0)}% of total
+              {((courses.filter((c) => c.is_ap).length / Math.max(courses.length, 1)) * 100).toFixed(0)}% of total
               courses
             </div>
           </CardContent>
@@ -246,7 +317,7 @@ export default function CoursesPage() {
             <CardTitle className="text-sm font-medium">Total Credits</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{courses.reduce((sum, course) => sum + course.credits, 0)}</div>
+            <div className="text-3xl font-bold">{courses.reduce((sum, course) => sum + (course.credits || 0), 0)}</div>
             <div className="mt-1 text-sm opacity-90">Across all courses</div>
           </CardContent>
         </Card>
@@ -301,8 +372,8 @@ export default function CoursesPage() {
                     </div>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {yearCourses.map((course) => {
-                        const { percentage, letterGrade } = calculateCourseGrade(course.id || "")
-                        const gradeColor = getCourseGradeColor(percentage)
+                        const { percentage, letterGrade } = calculateCourseGrade(course.id, grades)
+                        const gradeColor = getGradeColor(percentage)
 
                         return (
                           <Card
@@ -326,7 +397,7 @@ export default function CoursesPage() {
                                 <div>
                                   <CardTitle className="flex items-center">
                                     {course.code}
-                                    {course.isAP && (
+                                    {course.is_ap && (
                                       <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                                         AP
                                       </span>
@@ -376,7 +447,7 @@ export default function CoursesPage() {
                   <div>
                     <CardTitle className="flex items-center">
                       {selectedCourse.code}
-                      {selectedCourse.isAP && (
+                      {selectedCourse.is_ap && (
                         <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                           AP
                         </span>
@@ -396,7 +467,7 @@ export default function CoursesPage() {
                       onClick={(e) => {
                         e.stopPropagation()
                         if (selectedCourse.id) {
-                          removeCourse(selectedCourse.id)
+                          handleRemoveCourse(selectedCourse.id)
                         }
                       }}
                     >
@@ -430,7 +501,7 @@ export default function CoursesPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">AP Course:</span>
-                        <span className="text-sm">{selectedCourse.isAP ? "Yes" : "No"}</span>
+                        <span className="text-sm">{selectedCourse.is_ap ? "Yes" : "No"}</span>
                       </div>
                     </div>
                   </div>
@@ -438,8 +509,8 @@ export default function CoursesPage() {
                     <h3 className="text-sm font-medium mb-2">Grade Summary</h3>
                     <div className="space-y-2">
                       {(() => {
-                        const { percentage, letterGrade } = calculateCourseGrade(selectedCourse.id || "")
-                        const gradeColor = getCourseGradeColor(percentage)
+                        const { percentage, letterGrade } = calculateCourseGrade(selectedCourse.id, grades)
+                        const gradeColor = getGradeColor(percentage)
 
                         return (
                           <>
@@ -456,7 +527,7 @@ export default function CoursesPage() {
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Assignments:</span>
                         <span className="text-sm">
-                          {grades.filter((g) => g.courseId === selectedCourse.id).length} total
+                          {grades.filter((g) => g.course_id === selectedCourse.id).length} total
                         </span>
                       </div>
                       <div className="mt-4">
@@ -633,8 +704,8 @@ export default function CoursesPage() {
               <div className="flex items-center space-x-2">
                 <Switch
                   id="course-ap"
-                  checked={newCourse.isAP}
-                  onChange={(checked: boolean) => setNewCourse({ ...newCourse, isAP: checked })}
+                  checked={newCourse.is_ap}
+                  onCheckedChange={(checked: boolean) => setNewCourse({ ...newCourse, is_ap: checked })}
                 />
                 <Label htmlFor="course-ap">This is an Advanced Placement (AP) course</Label>
               </div>
@@ -653,7 +724,7 @@ export default function CoursesPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button onClick={addCourse} className="w-full">
+              <Button onClick={handleAddCourse} className="w-full">
                 <Plus className="mr-2 h-4 w-4" /> Add Course
               </Button>
             </CardFooter>
@@ -680,14 +751,14 @@ export default function CoursesPage() {
                         <DialogTitle>Add New Grade</DialogTitle>
                         <DialogDescription>Enter grade details for {selectedCourse.name}</DialogDescription>
                       </DialogHeader>
-                      <AddGradeForm courseId={selectedCourse.id || ""} />
+                      <AddGradeForm courseId={selectedCourse.id} onAddGrade={addGrade} />
                     </DialogContent>
                   </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
                 {(() => {
-                  const courseGrades = grades.filter((g) => g.courseId === selectedCourse.id)
+                  const courseGrades = grades.filter((g) => g.course_id === selectedCourse.id)
 
                   if (courseGrades.length === 0) {
                     return (
@@ -716,28 +787,28 @@ export default function CoursesPage() {
                       </TableHeader>
                       <TableBody>
                         {courseGrades
-                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                          .sort((a, b) => new Date(b.date || "").getTime() - new Date(a.date || "").getTime())
                           .map((grade) => {
-                            const percentage = (grade.score / grade.maxScore) * 100
-                            const gradeColor = getCourseGradeColor(percentage)
+                            const percentage = (grade.score / grade.max_score) * 100
+                            const gradeColor = getGradeColor(percentage)
 
                             return (
                               <TableRow key={grade.id}>
                                 <TableCell>{grade.title}</TableCell>
                                 <TableCell className="capitalize">{grade.type}</TableCell>
                                 <TableCell>
-                                  {grade.score} / {grade.maxScore}
+                                  {grade.score} / {grade.max_score}
                                 </TableCell>
                                 <TableCell className={gradeColor}>{percentage.toFixed(1)}%</TableCell>
                                 <TableCell>{grade.weight}%</TableCell>
-                                <TableCell>{new Date(grade.date).toLocaleDateString()}</TableCell>
+                                <TableCell>{new Date(grade.date || "").toLocaleDateString()}</TableCell>
                                 <TableCell>
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8"
                                     onClick={() => {
-                                      if (grade.id) deleteItem(db.grades, grade.id)
+                                      if (grade.id) deleteGrade(grade.id)
                                     }}
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -760,45 +831,34 @@ export default function CoursesPage() {
 }
 
 // Helper component for adding grades
-function AddGradeForm({ courseId }: { courseId: string }) {
-  const [newGrade, setNewGrade] = useState<Partial<Grade>>({
-    courseId,
+function AddGradeForm({ courseId, onAddGrade }: { courseId: string; onAddGrade: (grade: any) => Promise<any> }) {
+  const [newGrade, setNewGrade] = useState<any>({
+    course_id: courseId,
     title: "",
     type: "exam",
     score: 0,
-    maxScore: 100,
+    max_score: 100,
     weight: 10,
     date: new Date().toISOString().split("T")[0],
     notes: "",
   })
 
-  const addGrade = async () => {
-    if (!newGrade.title || newGrade.score === undefined || newGrade.maxScore === undefined) {
+  const handleAddGrade = async () => {
+    if (!newGrade.title || newGrade.score === undefined || newGrade.max_score === undefined) {
       return
     }
 
-    if (newGrade.maxScore <= 0) {
+    if (newGrade.max_score <= 0) {
       alert("Max score must be greater than 0")
       return
     }
 
-    if (newGrade.score < 0 || newGrade.score > newGrade.maxScore) {
-      alert(`Score must be between 0 and ${newGrade.maxScore}`)
+    if (newGrade.score < 0 || newGrade.score > newGrade.max_score) {
+      alert(`Score must be between 0 and ${newGrade.max_score}`)
       return
     }
 
-    const grade: Grade = {
-      courseId,
-      title: newGrade.title,
-      type: newGrade.type || "exam",
-      score: newGrade.score,
-      maxScore: newGrade.maxScore,
-      weight: newGrade.weight || 10,
-      date: newGrade.date || new Date().toISOString().split("T")[0],
-      notes: newGrade.notes || "",
-    }
-
-    await addItem(db.grades, grade)
+    await onAddGrade(newGrade)
 
     // Close dialog by dispatching Escape key
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
@@ -820,10 +880,7 @@ function AddGradeForm({ courseId }: { courseId: string }) {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="grade-type">Type</Label>
-            <Select
-              value={newGrade.type}
-              onValueChange={(value) => setNewGrade({ ...newGrade, type: value as Grade["type"] })}
-            >
+            <Select value={newGrade.type} onValueChange={(value) => setNewGrade({ ...newGrade, type: value })}>
               <SelectTrigger id="grade-type">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -870,9 +927,9 @@ function AddGradeForm({ courseId }: { courseId: string }) {
               type="number"
               min="0"
               step="0.01"
-              value={newGrade.maxScore}
+              value={newGrade.max_score}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setNewGrade({ ...newGrade, maxScore: Number(e.target.value) })
+                setNewGrade({ ...newGrade, max_score: Number(e.target.value) })
               }
             />
           </div>
@@ -906,7 +963,7 @@ function AddGradeForm({ courseId }: { courseId: string }) {
       </div>
 
       <DialogFooter>
-        <Button onClick={addGrade}>Add Grade</Button>
+        <Button onClick={handleAddGrade}>Add Grade</Button>
       </DialogFooter>
     </div>
   )

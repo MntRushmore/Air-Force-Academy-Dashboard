@@ -1,26 +1,48 @@
 import { createClient } from "@supabase/supabase-js"
+import { v4 as uuidv4 } from "uuid"
 
-// Create a single instance of the Supabase client
+// Initialize the Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Create a singleton instance of the Supabase client
+let supabaseInstance: ReturnType<typeof createClient> | null = null
 
-// Generate a unique client ID for anonymous users
-export function getClientId(): string {
-  // Check if we already have a client ID in localStorage
-  let clientId = localStorage.getItem("usafa_client_id")
-
-  // If not, generate a new one and store it
-  if (!clientId) {
-    clientId = crypto.randomUUID()
-    localStorage.setItem("usafa_client_id", clientId)
+export function getSupabaseClient() {
+  if (!supabaseInstance) {
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+      },
+      global: {
+        headers: {
+          "x-client-id": getClientId(),
+        },
+      },
+    })
   }
-
-  return clientId
+  return supabaseInstance
 }
 
-// Helper function to get data from Supabase
+// Client ID management for anonymous users
+export function getClientId(): string {
+  if (typeof window !== "undefined") {
+    let clientId = localStorage.getItem("usafa_client_id")
+
+    if (!clientId) {
+      clientId = uuidv4()
+      localStorage.setItem("usafa_client_id", clientId)
+    }
+
+    return clientId
+  }
+
+  // For server-side rendering, return a placeholder
+  // This will be replaced with the actual client ID on the client
+  return "server-side"
+}
+
+// Generic data fetching function
 export async function fetchData<T>(
   table: string,
   options?: {
@@ -30,28 +52,20 @@ export async function fetchData<T>(
     limit?: number
   },
 ): Promise<T[]> {
-  const clientId = getClientId()
+  const supabase = getSupabaseClient()
 
-  let query = supabase
-    .from(table)
-    .select(options?.columns || "*")
-    .eq("client_id", clientId)
+  let query = supabase.from(table).select(options?.columns || "*")
 
-  // Apply additional filters
   if (options?.filters) {
     Object.entries(options.filters).forEach(([key, value]) => {
       query = query.eq(key, value)
     })
   }
 
-  // Apply ordering
   if (options?.order) {
-    query = query.order(options.order.column, {
-      ascending: options.order.ascending ?? true,
-    })
+    query = query.order(options.order.column, { ascending: options.order.ascending ?? false })
   }
 
-  // Apply limit
   if (options?.limit) {
     query = query.limit(options.limit)
   }
@@ -60,58 +74,67 @@ export async function fetchData<T>(
 
   if (error) {
     console.error(`Error fetching data from ${table}:`, error)
-    return []
+    throw error
   }
 
   return data as T[]
 }
 
-// Helper function to insert data into Supabase
+// Insert data function
 export async function insertData<T>(
   table: string,
   data: Omit<T, "id" | "client_id" | "created_at" | "updated_at">,
 ): Promise<T | null> {
+  const supabase = getSupabaseClient()
   const clientId = getClientId()
 
-  const { data: insertedData, error } = await supabase
+  const { data: result, error } = await supabase
     .from(table)
-    .insert({
-      ...data,
-      client_id: clientId,
-    })
+    .insert({ ...data, client_id: clientId })
     .select()
+    .single()
 
   if (error) {
     console.error(`Error inserting data into ${table}:`, error)
-    return null
+    throw error
   }
 
-  return insertedData?.[0] as T
+  return result as T
 }
 
-// Helper function to update data in Supabase
-export async function updateData<T>(table: string, id: string, data: Partial<T>): Promise<boolean> {
+// Update data function
+export async function updateData<T>(
+  table: string,
+  id: string,
+  data: Partial<Omit<T, "id" | "client_id" | "created_at" | "updated_at">>,
+): Promise<boolean> {
+  const supabase = getSupabaseClient()
   const clientId = getClientId()
 
-  const { error } = await supabase.from(table).update(data).eq("id", id).eq("client_id", clientId)
+  const { error } = await supabase
+    .from(table)
+    .update({ ...data, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("client_id", clientId)
 
   if (error) {
     console.error(`Error updating data in ${table}:`, error)
-    return false
+    throw error
   }
 
   return true
 }
 
-// Helper function to delete data from Supabase
+// Delete data function
 export async function deleteData(table: string, id: string): Promise<boolean> {
+  const supabase = getSupabaseClient()
   const clientId = getClientId()
 
   const { error } = await supabase.from(table).delete().eq("id", id).eq("client_id", clientId)
 
   if (error) {
     console.error(`Error deleting data from ${table}:`, error)
-    return false
+    throw error
   }
 
   return true
