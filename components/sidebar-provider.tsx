@@ -28,6 +28,14 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
+type SidebarContextType = {
+  isOpen: boolean
+  toggle: () => void
+  isMobile: boolean
+}
+
+const SidebarContext = React.createContext<SidebarContextType | undefined>(undefined)
+
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed: boolean
   setIsCollapsed: (collapsed: boolean) => void
@@ -166,67 +174,110 @@ interface SidebarProviderProps {
   children: React.ReactNode
 }
 
-export function SidebarProvider({ children }: SidebarProviderProps) {
+export function SidebarProvider({ children }: { children: React.ReactNode }) {
+  const [isOpen, setIsOpen] = React.useState(true)
+  const [isMobile, setIsMobile] = React.useState(false)
+  const pathname = usePathname()
+
+  // Check if we're on mobile
+  React.useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+      // If we're on mobile, close the sidebar by default
+      if (window.innerWidth < 768) {
+        setIsOpen(false)
+      } else {
+        setIsOpen(true)
+      }
+    }
+
+    // Check on mount
+    checkIsMobile()
+
+    // Check on resize
+    window.addEventListener("resize", checkIsMobile)
+    return () => window.removeEventListener("resize", checkIsMobile)
+  }, [])
+
+  // Close sidebar on mobile when navigating
+  React.useEffect(() => {
+    if (isMobile) {
+      setIsOpen(false)
+    }
+  }, [pathname, isMobile])
+
+  const toggle = React.useCallback(() => {
+    setIsOpen((prev) => !prev)
+  }, [])
+
   const [isCollapsed, setIsCollapsed] = React.useState(false)
   const [isMobileOpen, setIsMobileOpen] = React.useState(false)
 
   // Check if we're on mobile
-  const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false
+  // const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false
 
-  React.useEffect(() => {
-    // Handle resize events to update isMobile state
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setIsCollapsed(true)
-      }
-    }
+  // React.useEffect(() => {
+  //   // Handle resize events to update isMobile state
+  //   const handleResize = () => {
+  //     if (window.innerWidth < 768) {
+  //       setIsCollapsed(true)
+  //     }
+  //   }
 
-    // Set initial state
-    handleResize()
+  //   // Set initial state
+  //   handleResize()
 
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
+  //   window.addEventListener("resize", handleResize)
+  //   return () => window.removeEventListener("resize", handleResize)
+  // }, [])
 
   return (
-    <div className="flex h-full">
-      {/* Desktop sidebar */}
-      <div
-        className={cn("hidden md:block border-r transition-all duration-300", isCollapsed ? "w-[60px]" : "w-[240px]")}
-      >
-        <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-      </div>
+    <SidebarContext.Provider value={{ isOpen, toggle, isMobile }}>
+      <div className="flex h-full">
+        {/* Desktop sidebar */}
+        <div className={cn("hidden md:block border-r transition-all duration-300", isOpen ? "w-[240px]" : "w-[60px]")}>
+          <Sidebar isCollapsed={!isOpen} setIsCollapsed={toggle} />
+        </div>
 
-      {/* Mobile sidebar with Sheet component */}
-      <div className="md:hidden">
-        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="fixed top-4 left-4 z-40">
-              <Menu className="h-4 w-4" />
-              <span className="sr-only">Toggle Menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-[240px]">
-            <div className="flex justify-between items-center p-4">
-              <h2 className="text-lg font-semibold">USAFA Dashboard</h2>
-              <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(false)}>
-                <X className="h-4 w-4" />
+        {/* Mobile sidebar with Sheet component */}
+        <div className="md:hidden">
+          <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="fixed top-4 left-4 z-40">
+                <Menu className="h-4 w-4" />
+                <span className="sr-only">Toggle Menu</span>
               </Button>
-            </div>
-            <Sidebar isCollapsed={false} setIsCollapsed={() => {}} />
-          </SheetContent>
-        </Sheet>
-      </div>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-[240px]">
+              <div className="flex justify-between items-center p-4">
+                <h2 className="text-lg font-semibold">USAFA Dashboard</h2>
+                <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <Sidebar isCollapsed={false} setIsCollapsed={() => {}} />
+            </SheetContent>
+          </Sheet>
+        </div>
 
-      {/* Main content */}
-      <div
-        className={cn(
-          "flex-1 overflow-auto",
-          isMobile && "pt-14", // Add padding top on mobile for the menu button
-        )}
-      >
-        {children}
+        {/* Main content */}
+        <div
+          className={cn(
+            "flex-1 overflow-auto",
+            isMobile && "pt-14", // Add padding top on mobile for the menu button
+          )}
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </SidebarContext.Provider>
   )
+}
+
+export function useSidebar() {
+  const context = React.useContext(SidebarContext)
+  if (context === undefined) {
+    throw new Error("useSidebar must be used within a SidebarProvider")
+  }
+  return context
 }
