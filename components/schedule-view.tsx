@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { format, parseISO, isToday, isBefore, isAfter, addDays, subDays } from "date-fns"
-import { ChevronLeft, ChevronRight, MapPin, Clock, CalendarIcon, Tag } from "lucide-react"
+import { ChevronLeft, ChevronRight, MapPin, Clock, CalendarIcon, Tag, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { fetchCalendarEvents, getScheduleSettings } from "@/lib/schedule-actions"
 import type { CalendarEvent } from "@/lib/types"
@@ -45,7 +45,9 @@ export function ScheduleView() {
         setEvents(calendarEvents)
       } catch (error) {
         console.error("Failed to load events:", error)
-        setError("Failed to load calendar events. Please check your iCalendar URL.")
+        setError(
+          error instanceof Error ? error.message : "Failed to load calendar events. Please check your iCalendar URL.",
+        )
       } finally {
         setIsLoading(false)
       }
@@ -108,7 +110,9 @@ export function ScheduleView() {
 
   if (error) {
     return (
-      <Alert variant="destructive">
+      <Alert variant="destructive" className="mb-4">
+        <AlertCircle className="h-4 w-4 mr-2" />
+        <AlertTitle>Error loading calendar</AlertTitle>
         <AlertDescription>{error}</AlertDescription>
       </Alert>
     )

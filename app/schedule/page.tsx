@@ -26,13 +26,8 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  fetchCalendarEvents,
-  saveCalendarUrl,
-  saveCalendarSettings,
-  getCalendarSettings,
-  type CalendarEvent,
-} from "@/lib/calendar-actions"
+import { fetchCalendarEvents, saveIcsUrl, saveScheduleSettings, getScheduleSettings } from "@/lib/schedule-actions"
+import type { CalendarEvent } from "@/lib/types"
 import { toast } from "@/components/ui/use-toast"
 
 export default function SchedulePage() {
@@ -56,8 +51,21 @@ export default function SchedulePage() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const savedUrl = (await getSetting("calendarUrl")) || ""
-        const savedSettings = await getCalendarSettings()
+        const savedUrl = (await getSetting("ics_url")) || ""
+        let savedSettings
+
+        try {
+          savedSettings = await getScheduleSettings()
+        } catch (settingsError) {
+          console.error("Error loading schedule settings:", settingsError)
+          savedSettings = {
+            dayStartHour: 7,
+            dayEndHour: 22,
+            hidePastEvents: false,
+            defaultView: "day",
+            categories: [],
+          }
+        }
 
         setCalendarUrl(savedUrl)
         setSettings(savedSettings)
@@ -79,16 +87,13 @@ export default function SchedulePage() {
     setError(null)
 
     try {
-      const { events, error } = await fetchCalendarEvents()
-
-      if (error) {
-        setError(error)
-      } else {
-        setEvents(events)
-      }
+      const events = await fetchCalendarEvents()
+      setEvents(events)
     } catch (err) {
       console.error("Error fetching calendar:", err)
-      setError("Failed to fetch calendar data. Please check the URL and try again.")
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch calendar data. Please check the URL and try again.",
+      )
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -99,30 +104,22 @@ export default function SchedulePage() {
   const handleSaveUrl = async () => {
     try {
       setLoading(true)
-      const { success, error } = await saveCalendarUrl(calendarUrl)
+      await saveIcsUrl(calendarUrl)
 
-      if (!success) {
-        toast({
-          title: "Error",
-          description: error || "Failed to save calendar URL",
-          variant: "destructive",
-        })
-        setError(error || "Failed to save calendar URL")
-      } else {
-        toast({
-          title: "Success",
-          description: "Calendar URL saved successfully",
-        })
-        setShowSettings(false)
-        await loadCalendarData()
-      }
+      toast({
+        title: "Success",
+        description: "Calendar URL saved successfully",
+      })
+      setShowSettings(false)
+      await loadCalendarData()
     } catch (err) {
       console.error("Error saving URL:", err)
       toast({
         title: "Error",
-        description: "Failed to save calendar URL",
+        description: err instanceof Error ? err.message : "Failed to save calendar URL",
         variant: "destructive",
       })
+      setError(err instanceof Error ? err.message : "Failed to save calendar URL")
     } finally {
       setLoading(false)
     }
@@ -131,12 +128,12 @@ export default function SchedulePage() {
   // Save calendar settings
   const handleSaveSettings = async () => {
     try {
-      const { success, error } = await saveCalendarSettings(settings)
+      const result = await saveScheduleSettings(settings)
 
-      if (!success) {
+      if (!result.success) {
         toast({
           title: "Error",
-          description: error || "Failed to save settings",
+          description: result.error || "Failed to save settings",
           variant: "destructive",
         })
       } else {
@@ -357,7 +354,7 @@ export default function SchedulePage() {
                     <SelectContent>
                       {Array.from({ length: 24 }, (_, i) => (
                         <SelectItem key={i} value={i.toString()}>
-                          {i === 0 ? "12 AM" : i < 12 ? `${i} AM` : i === 12 ? "12 PM" : `${i - 12} PM`}
+                          {i === 0 ? '12 AM" : i &lt; 12 ? `${i} AM` : i === 12 ? "12 PM' : `${i - 12} PM`}
                         </SelectItem>
                       ))}
                     </SelectContent>

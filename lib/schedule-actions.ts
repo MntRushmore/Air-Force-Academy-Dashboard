@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { openDB } from "./db"
+import { setSetting, getSetting } from "./db"
 import { v4 as uuidv4 } from "uuid"
 import type { CalendarEvent } from "./types"
 
@@ -9,35 +9,38 @@ import type { CalendarEvent } from "./types"
 import ical from "ical"
 
 export async function saveIcsUrl(url: string) {
-  const db = await openDB()
-
   try {
+    if (!url) {
+      throw new Error("URL is required")
+    }
+
+    // Basic URL validation
+    try {
+      new URL(url)
+    } catch (e) {
+      throw new Error("Invalid URL format")
+    }
+
     // Validate the URL by trying to fetch it
     const response = await fetch(url)
     if (!response.ok) {
-      throw new Error("Invalid iCalendar URL")
+      throw new Error("Invalid iCalendar URL - Unable to fetch calendar data")
     }
 
     // Save the URL to the database
-    await db.put("settings", {
-      id: "ics_url",
-      value: url,
-    })
+    await setSetting("ics_url", url)
 
     revalidatePath("/schedule")
     return true
   } catch (error) {
     console.error("Error saving iCalendar URL:", error)
-    throw new Error("Failed to save iCalendar URL")
+    throw error
   }
 }
 
 export async function getIcsUrl() {
-  const db = await openDB()
-
   try {
-    const setting = await db.get("settings", "ics_url")
-    return setting?.value || ""
+    return (await getSetting("ics_url")) || ""
   } catch (error) {
     console.error("Error getting iCalendar URL:", error)
     return ""
@@ -45,32 +48,24 @@ export async function getIcsUrl() {
 }
 
 export async function saveScheduleSettings(settings: any) {
-  const db = await openDB()
-
   try {
-    await db.put("settings", {
-      id: "schedule_settings",
-      value: settings,
-    })
-
+    await setSetting("schedule_settings", settings)
     revalidatePath("/schedule")
-    return true
+    return { success: true }
   } catch (error) {
     console.error("Error saving schedule settings:", error)
-    throw new Error("Failed to save schedule settings")
+    return { success: false, error: "Failed to save schedule settings" }
   }
 }
 
 export async function getScheduleSettings() {
-  const db = await openDB()
-
   try {
-    const setting = await db.get("settings", "schedule_settings")
+    const settings = await getSetting("schedule_settings")
     return (
-      setting?.value || {
+      settings || {
         showPastEvents: false,
-        dayStartHour: "6",
-        dayEndHour: "22",
+        dayStartHour: 6,
+        dayEndHour: 22,
         defaultView: "day",
         categories: [],
       }
@@ -79,8 +74,8 @@ export async function getScheduleSettings() {
     console.error("Error getting schedule settings:", error)
     return {
       showPastEvents: false,
-      dayStartHour: "6",
-      dayEndHour: "22",
+      dayStartHour: 6,
+      dayEndHour: 22,
       defaultView: "day",
       categories: [],
     }
@@ -112,7 +107,7 @@ export async function fetchCalendarEvents(): Promise<CalendarEvent[]> {
         if (event.type === "VEVENT") {
           events.push({
             id: event.uid || uuidv4(),
-            summary: event.summary || "Untitled Event",
+            title: event.summary || "Untitled Event",
             description: event.description || "",
             location: event.location || "",
             start: event.start?.toISOString() || new Date().toISOString(),
@@ -129,6 +124,6 @@ export async function fetchCalendarEvents(): Promise<CalendarEvent[]> {
     return events
   } catch (error) {
     console.error("Error fetching calendar events:", error)
-    throw new Error("Failed to fetch calendar events")
+    throw new Error("Failed to fetch calendar events. Please check your iCalendar URL.")
   }
 }

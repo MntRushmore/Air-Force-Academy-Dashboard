@@ -1,10 +1,36 @@
 import Dexie, { type Table } from "dexie"
 
-// Add back the openDB function that was missing
+// Improved openDB function with proper compatibility methods
 export const openDB = async () => {
   // This is a compatibility function to maintain the API
-  // It returns the db instance directly now instead of using idb's openDB
   return {
+    get: async (storeName: string, key: string) => {
+      // Map to the appropriate Dexie table and get the item
+      if (storeName === "settings") {
+        return await db.settings.where("key").equals(key).first()
+      }
+      return null
+    },
+    put: async (storeName: string, value: any) => {
+      // Map to the appropriate Dexie table and put the item
+      if (storeName === "settings") {
+        const existingItem = await db.settings
+          .where("key")
+          .equals(value.key || value.id)
+          .first()
+        if (existingItem) {
+          await db.settings.update(existingItem.id!, value)
+          return existingItem.id
+        } else {
+          return await db.settings.add({
+            ...value,
+            key: value.key || value.id,
+            createdAt: new Date(),
+          })
+        }
+      }
+      return null
+    },
     transaction: async (storeName: string, mode: "readonly" | "readwrite") => {
       return {
         objectStore: (name: string) => {
@@ -345,20 +371,30 @@ function percentageToGradePoints(percentage: number, isAP: boolean): number {
 
 // Settings helper functions
 export async function getSetting(key: string): Promise<any> {
-  const setting = await db.settings.where("key").equals(key).first()
-  return setting?.value
+  try {
+    const setting = await db.settings.where("key").equals(key).first()
+    return setting?.value
+  } catch (error) {
+    console.error(`Error getting setting ${key}:`, error)
+    return null
+  }
 }
 
 export async function setSetting(key: string, value: any): Promise<void> {
-  const existingSetting = await db.settings.where("key").equals(key).first()
+  try {
+    const existingSetting = await db.settings.where("key").equals(key).first()
 
-  if (existingSetting) {
-    await db.settings.update(existingSetting.id!, { value })
-  } else {
-    await db.settings.add({
-      key,
-      value,
-      createdAt: new Date(),
-    })
+    if (existingSetting) {
+      await db.settings.update(existingSetting.id!, { value })
+    } else {
+      await db.settings.add({
+        key,
+        value,
+        createdAt: new Date(),
+      })
+    }
+  } catch (error) {
+    console.error(`Error setting ${key}:`, error)
+    throw error
   }
 }

@@ -275,3 +275,8 @@ export async function migrateClientIdColumn(): Promise<boolean> {
     return false
   }
 }
+
+const supabaseUrl2 = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+const supabaseAnonKey2 = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+
+export const supabase = createClient(supabaseUrl2, supabaseAnonKey2)

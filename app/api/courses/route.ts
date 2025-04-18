@@ -32,13 +32,16 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("API error inserting course:", error)
-      return NextResponse.json({ error: `Failed to insert course: ${error.message}` }, { status: 500 })
+      return NextResponse.json(
+        { error: `Failed to insert course: ${error.message}, code: ${error.code}` },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ data })
-  } catch (err) {
+  } catch (err: any) {
     console.error("Unexpected API error:", err)
-    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
+    return NextResponse.json({ error: `An unexpected error occurred: ${err.message}` }, { status: 500 })
   }
 }
 
@@ -57,13 +60,16 @@ export async function GET() {
 
     if (error) {
       console.error("API error fetching courses:", error)
-      return NextResponse.json({ error: `Failed to fetch courses: ${error.message}` }, { status: 500 })
+      return NextResponse.json(
+        { error: `Failed to fetch courses: ${error.message}, code: ${error.code}` },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ data })
-  } catch (err) {
+  } catch (err: any) {
     console.error("Unexpected API error:", err)
-    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
+    return NextResponse.json({ error: `An unexpected error occurred: ${err.message}` }, { status: 500 })
   }
 }
 
@@ -89,12 +95,15 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error("API error deleting course:", error)
-      return NextResponse.json({ error: `Failed to delete course: ${error.message}` }, { status: 500 })
+      return NextResponse.json(
+        { error: `Failed to delete course: ${error.message}, code: ${error.code}` },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ success: true })
-  } catch (err) {
+  } catch (err: any) {
     console.error("Unexpected API error:", err)
-    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
+    return NextResponse.json({ error: `An unexpected error occurred: ${err.message}` }, { status: 500 })
   }
 }
