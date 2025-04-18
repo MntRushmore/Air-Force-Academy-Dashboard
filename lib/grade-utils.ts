@@ -5,7 +5,6 @@ type Grade = Database["public"]["Tables"]["grades"]["Row"]
 
 // Calculate GPA based on courses and grades
 export function calculateGPA(courses: Course[], grades: Grade[]): number {
-  // Return 0 when no courses exist
   if (!courses || courses.length === 0) return 0
 
   let totalPoints = 0
@@ -114,13 +113,7 @@ export function getGradeColor(percentage: number): string {
   return "text-red-600 dark:text-red-400"
 }
 
-// Format GPA to 2 decimal places with proper handling for empty values
-export function formatGPA(gpa: number | null | undefined): string {
-  if (gpa === null || gpa === undefined || isNaN(gpa)) return "0.00"
+// Format GPA to 2 decimal places
+export function formatGPA(gpa: number): string {
   return gpa.toFixed(2)
-}
-
-// Check if GPA should be displayed
-export function shouldDisplayGPA(courses: Course[] | null | undefined): boolean {
-  return !!courses && courses.length > 0
 }

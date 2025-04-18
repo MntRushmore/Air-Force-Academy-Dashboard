@@ -4,7 +4,7 @@ import type React from "react"
 
 import { createContext, useContext, useState, useEffect } from "react"
 
-interface SidebarContextType {
+type SidebarContextType = {
   open: boolean
   setOpen: (open: boolean) => void
   mobileOpen: boolean
@@ -19,24 +19,31 @@ const SidebarContext = createContext<SidebarContextType>({
 })
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
-  // Get initial state from localStorage if available
-  const [open, setOpen] = useState(true)
-  const [mobileOpen, setMobileOpen] = useState(false)
+  // Initialize with localStorage value if available, otherwise default to true
+  const [open, setOpen] = useState<boolean>(true)
+  const [mobileOpen, setMobileOpen] = useState<boolean>(false)
 
   // Load sidebar state from localStorage on mount
   useEffect(() => {
-    const savedState = localStorage.getItem("sidebarOpen")
-    if (savedState !== null) {
-      setOpen(savedState === "true")
+    if (typeof window !== "undefined") {
+      const savedState = localStorage.getItem("sidebarOpen")
+      if (savedState !== null) {
+        setOpen(savedState === "true")
+      } else {
+        // Default to closed on mobile, open on desktop
+        setOpen(window.innerWidth >= 768)
+      }
     }
   }, [])
 
   // Save sidebar state to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem("sidebarOpen", open.toString())
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sidebarOpen", String(open))
+    }
   }, [open])
 
-  // Close mobile sidebar on resize
+  // Close mobile sidebar on window resize
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 768 && mobileOpen) {
@@ -53,4 +60,10 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-export const useSidebar = () => useContext(SidebarContext)
+export const useSidebar = () => {
+  const context = useContext(SidebarContext)
+  if (!context) {
+    throw new Error("useSidebar must be used within a SidebarProvider")
+  }
+  return context
+}

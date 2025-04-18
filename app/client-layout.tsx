@@ -2,38 +2,59 @@
 
 import type React from "react"
 
+import { useState, useEffect } from "react"
+import { ThemeProvider } from "@/components/theme-provider"
+import { SidebarProvider } from "@/components/sidebar-provider"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
-import { useSidebar } from "@/components/sidebar-provider"
-import { useEffect } from "react"
+import { AuthProvider } from "@/components/auth-provider"
+import { preloadCriticalResources, handleResourceError } from "@/lib/resource-loader"
 
-interface ClientLayoutProps {
-  children: React.ReactNode
-}
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false)
 
-export default function ClientLayout({ children }: ClientLayoutProps) {
-  const { open, mobileOpen } = useSidebar()
-
-  // Add effect to handle body overflow when mobile sidebar is open
   useEffect(() => {
-    if (mobileOpen) {
-      document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = "auto"
-    }
+    setMounted(true)
+
+    // Preload critical resources
+    preloadCriticalResources()
+
+    // Add global error handler for resource loading
+    window.addEventListener(
+      "error",
+      (event) => {
+        // Check if it's a resource loading error
+        if (
+          event.target instanceof HTMLImageElement ||
+          event.target instanceof HTMLScriptElement ||
+          event.target instanceof HTMLLinkElement
+        ) {
+          handleResourceError(event)
+          // Prevent the error from propagating
+          event.preventDefault()
+        }
+      },
+      true,
+    )
 
     return () => {
-      document.body.style.overflow = "auto"
+      window.removeEventListener("error", handleResourceError, true)
     }
-  }, [mobileOpen])
+  }, [])
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppSidebar />
-      <div className={`flex flex-col transition-all duration-300 ${open ? "md:ml-64" : "md:ml-16"}`}>
-        <AppHeader />
-        <main className="flex-1 container mx-auto py-6 px-4 md:px-6">{children}</main>
-      </div>
-    </div>
+    <AuthProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <SidebarProvider>
+          <div className="flex min-h-screen flex-col">
+            <AppHeader />
+            <div className="flex flex-1">
+              <AppSidebar />
+              <main className="flex-1 p-4 md:p-6">{mounted ? children : null}</main>
+            </div>
+          </div>
+        </SidebarProvider>
+      </ThemeProvider>
+    </AuthProvider>
   )
 }

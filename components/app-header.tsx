@@ -53,15 +53,7 @@ export function AppHeader() {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        {/* PWAInstaller */}
-        {(() => {
-          try {
-            return <PWAInstaller />
-          } catch (error) {
-            console.error("Failed to render PWAInstaller:", error)
-            return null
-          }
-        })()}
+        <PWAInstaller />
         <ModeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
