@@ -8,7 +8,6 @@ import {
   ClipboardList,
   Clock,
   FileText,
-  Flame,
   GraduationCap,
   Home,
   LineChart,
@@ -16,6 +15,7 @@ import {
   Settings,
   Target,
   Users,
+  Dumbbell,
 } from "lucide-react"
 import {
   Sidebar,
@@ -30,82 +30,87 @@ import {
 } from "@/components/ui/sidebar"
 
 export function AppSidebar() {
-  const { open, setOpen, mobileOpen, setMobileOpen } = useSidebar()
+  const { open, setIsOpen, isMobile } = useSidebar()
   const pathname = usePathname()
 
   const routes = [
     {
-      title: "Dashboard",
+      label: "Dashboard",
       icon: Home,
       href: "/",
     },
     {
-      title: "Schedule",
+      label: "Schedule",
       icon: Calendar,
       href: "/schedule",
     },
     {
-      title: "Goals",
+      label: "Goals",
       icon: Target,
       href: "/goals",
     },
     {
-      title: "Journal",
+      label: "Journal",
       icon: PenTool,
       href: "/journal",
     },
     {
-      title: "Study",
+      label: "Study",
       icon: BookOpen,
       href: "/study",
     },
     {
-      title: "Pomodoro",
+      label: "Pomodoro",
       icon: Clock,
       href: "/pomodoro",
     },
     {
-      title: "Grades",
+      label: "Grades",
       icon: FileText,
       href: "/grades",
     },
     {
-      title: "Report Card",
+      label: "Report Card",
       icon: ClipboardList,
       href: "/report-card",
     },
     {
-      title: "Grade Comparison",
+      label: "Grade Comparison",
       icon: LineChart,
       href: "/grade-comparison",
     },
     {
-      title: "Grade Prediction",
+      label: "Grade Prediction",
       icon: GraduationCap,
       href: "/grade-prediction",
     },
     {
-      title: "Fitness",
-      icon: Flame,
+      label: "Fitness",
+      icon: Dumbbell,
       href: "/fitness",
     },
     {
-      title: "Mentorship",
+      label: "Mentorship",
       icon: Users,
       href: "/mentorship",
     },
     {
-      title: "Timeline",
+      label: "Timeline",
       icon: LineChart,
       href: "/timeline",
     },
     {
-      title: "Progress",
+      label: "Progress",
       icon: LineChart,
       href: "/progress",
     },
     {
-      title: "Settings",
+      label: "Courses",
+      icon: BookOpen,
+      href: "/courses",
+    },
+    {
+      label: "Settings",
       icon: Settings,
       href: "/settings",
     },
@@ -123,10 +128,10 @@ export function AppSidebar() {
         <SidebarMenu>
           {routes.map((route) => (
             <SidebarMenuItem key={route.href}>
-              <SidebarMenuButton asChild isActive={pathname === route.href} tooltip={route.title}>
-                <Link href={route.href}>
+              <SidebarMenuButton asChild isActive={pathname === route.href} tooltip={route.label}>
+                <Link href={route.href} onClick={() => isMobile && setIsOpen(false)}>
                   <route.icon className="h-4 w-4" />
-                  <span>{route.title}</span>
+                  <span>{route.label}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

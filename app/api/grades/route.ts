@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       client_id: clientId !== "server-side" ? clientId : request.headers.get("x-client-id") || "api-client",
     }
 
-    // Insert the grade using service role (bypasses RLS)
+    // Insert the grade using service role (bypassing RLS)
     const { data, error } = await supabase.from("grades").insert(dataWithClientId).select().single()
 
     if (error) {

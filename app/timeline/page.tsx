@@ -43,29 +43,18 @@ export default function TimelinePage() {
   async function fetchEvents() {
     try {
       setLoading(true)
-      const { data: user } = await supabase.auth.getUser()
-
-      if (!user.user) {
-        toast({
-          title: "Authentication Error",
-          description: "Please sign in to view your timeline",
-          variant: "destructive",
-        })
-        return
-      }
 
       // Fetch from timeline_events table
       const { data, error } = await supabase
         .from("timeline_events")
         .select("*")
-        .eq("user_id", user.user.id)
         .order("event_date", { ascending: true })
 
       if (error) {
         throw error
       }
 
-      setEvents(data)
+      setEvents(data || [])
     } catch (error) {
       console.error("Error fetching timeline events:", error)
       toast({
@@ -89,17 +78,6 @@ export default function TimelinePage() {
         return
       }
 
-      const { data: user } = await supabase.auth.getUser()
-
-      if (!user.user) {
-        toast({
-          title: "Authentication Error",
-          description: "Please sign in to add events",
-          variant: "destructive",
-        })
-        return
-      }
-
       // Get the highest position to add the new event at the end
       const { data: positionData, error: positionError } = await supabase
         .from("timeline_events")
@@ -118,7 +96,6 @@ export default function TimelinePage() {
         .from("timeline_events")
         .insert([
           {
-            user_id: user.user.id,
             title: newEvent.title,
             description: newEvent.description,
             event_date: newEvent.event_date,
@@ -161,17 +138,6 @@ export default function TimelinePage() {
 
   async function handleUpdateEvent(event: TimelineEvent) {
     try {
-      const { data: user } = await supabase.auth.getUser()
-
-      if (!user.user) {
-        toast({
-          title: "Authentication Error",
-          description: "Please sign in to update events",
-          variant: "destructive",
-        })
-        return
-      }
-
       // Update in timeline_events table
       const { error } = await supabase
         .from("timeline_events")
@@ -183,7 +149,6 @@ export default function TimelinePage() {
           status: event.status,
         })
         .eq("id", event.id)
-        .eq("user_id", user.user.id)
 
       if (error) {
         throw error
@@ -208,19 +173,8 @@ export default function TimelinePage() {
 
   async function handleDeleteEvent(id: string) {
     try {
-      const { data: user } = await supabase.auth.getUser()
-
-      if (!user.user) {
-        toast({
-          title: "Authentication Error",
-          description: "Please sign in to delete events",
-          variant: "destructive",
-        })
-        return
-      }
-
       // Delete from timeline_events table
-      const { error } = await supabase.from("timeline_events").delete().eq("id", id).eq("user_id", user.user.id)
+      const { error } = await supabase.from("timeline_events").delete().eq("id", id)
 
       if (error) {
         throw error

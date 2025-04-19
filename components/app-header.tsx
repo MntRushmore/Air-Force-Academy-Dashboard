@@ -16,7 +16,7 @@ import { ModeToggle } from "@/components/mode-toggle"
 import { PWAInstaller } from "@/components/pwa-installer"
 
 export function AppHeader() {
-  const { open, setOpen, setMobileOpen } = useSidebar()
+  const { open, setIsOpen, isMobile, setOpenMobile } = useSidebar()
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center border-b bg-background px-4 md:px-6">
@@ -25,7 +25,7 @@ export function AppHeader() {
           variant="ghost"
           size="icon"
           className="mr-2 md:hidden"
-          onClick={() => setMobileOpen(true)}
+          onClick={() => setOpenMobile(true)}
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
@@ -35,7 +35,7 @@ export function AppHeader() {
           variant="ghost"
           size="icon"
           className="hidden md:flex mr-2"
-          onClick={() => setOpen(!open)}
+          onClick={() => setIsOpen(!open)}
           aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
         >
           <ChevronLeft className={`h-5 w-5 transition-transform ${open ? "" : "rotate-180"}`} />

@@ -1,6 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
+
+import { useState } from "react"
+
 import Link from "next/link"
 import { Bell, Cloud, Download, Moon, Palette, Save, SettingsIcon, Sun, Upload } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -46,35 +49,26 @@ export default function SettingsPage() {
   async function loadSettings() {
     try {
       setLoading(true)
-      const { data: user } = await supabase.auth.getUser()
 
-      if (!user.user) {
-        toast({
-          title: "Authentication Error",
-          description: "Please sign in to view your settings",
-          variant: "destructive",
-        })
-        return
-      }
+      const { data, error } = await supabase.from("settings").select("*")
 
-      const { data, error } = await supabase.from("settings").select("*").eq("user_id", user.user.id).single()
-
-      if (error && error.code !== "PGRST116") {
+      if (error) {
         throw error
       }
 
-      if (data) {
+      if (data && data.length > 0) {
+        const settingsData = data[0]
         setSettings({
-          theme: data.theme || "system",
-          notifications: data.notifications !== false,
-          pomodoro_work_duration: data.pomodoro_work_duration || 25,
-          pomodoro_break_duration: data.pomodoro_break_duration || 5,
-          pomodoro_long_break_duration: data.pomodoro_long_break_duration || 15,
-          pomodoro_cycles: data.pomodoro_cycles || 4,
+          theme: settingsData.theme || "system",
+          notifications: settingsData.notifications !== false,
+          pomodoro_work_duration: settingsData.pomodoro_work_duration || 25,
+          pomodoro_break_duration: settingsData.pomodoro_break_duration || 5,
+          pomodoro_long_break_duration: settingsData.pomodoro_long_break_duration || 15,
+          pomodoro_cycles: settingsData.pomodoro_cycles || 4,
         })
 
         // Update theme
-        setTheme(data.theme || "system")
+        setTheme(settingsData.theme || "system")
       }
     } catch (error) {
       console.error("Error loading settings:", error)
@@ -91,19 +85,8 @@ export default function SettingsPage() {
   async function saveSettings() {
     try {
       setSaving(true)
-      const { data: user } = await supabase.auth.getUser()
-
-      if (!user.user) {
-        toast({
-          title: "Authentication Error",
-          description: "Please sign in to save settings",
-          variant: "destructive",
-        })
-        return
-      }
 
       const { error } = await supabase.from("settings").upsert({
-        user_id: user.user.id,
         theme: settings.theme,
         notifications: settings.notifications,
         pomodoro_work_duration: settings.pomodoro_work_duration,

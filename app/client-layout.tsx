@@ -4,10 +4,9 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { ThemeProvider } from "@/components/theme-provider"
-import { SidebarProvider } from "@/components/sidebar-provider"
+import { SidebarProvider } from "@/components/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
-import { AuthProvider } from "@/components/auth-provider"
 import { preloadCriticalResources, handleResourceError } from "@/lib/resource-loader"
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -43,18 +42,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }, [])
 
   return (
-    <AuthProvider>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <SidebarProvider>
-          <div className="flex min-h-screen flex-col">
-            <AppHeader />
-            <div className="flex flex-1">
-              <AppSidebar />
-              <main className="flex-1 p-4 md:p-6">{mounted ? children : null}</main>
-            </div>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <SidebarProvider>
+        <div className="flex min-h-screen flex-col">
+          <AppHeader />
+          <div className="flex flex-1">
+            <AppSidebar />
+            <main className="flex-1 p-4 md:p-6">{mounted ? children : null}</main>
           </div>
-        </SidebarProvider>
-      </ThemeProvider>
-    </AuthProvider>
+        </div>
+      </SidebarProvider>
+    </ThemeProvider>
   )
 }

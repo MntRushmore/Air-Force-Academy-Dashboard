@@ -1,655 +1,367 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState } from "react"
+import { CalendarIcon, Plus } from "lucide-react"
+import { format } from "date-fns"
+
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Skeleton } from "@/components/ui/skeleton"
-import { ChevronLeft, ChevronRight, Calendar, Settings, RefreshCw, AlertCircle } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  format,
-  addDays,
-  subDays,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  isToday,
-  parseISO,
-  isSameDay,
-  isBefore,
-} from "date-fns"
-import { getSetting } from "@/lib/db"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Switch } from "@/components/ui/switch"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { FormDescription, FormLabel } from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { fetchCalendarEvents, saveIcsUrl, saveScheduleSettings, getScheduleSettings } from "@/lib/schedule-actions"
-import type { CalendarEvent } from "@/lib/types"
-import { toast } from "@/components/ui/use-toast"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 
 export default function SchedulePage() {
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [calendarUrl, setCalendarUrl] = useState("")
-  const [showSettings, setShowSettings] = useState(false)
-  const [settings, setSettings] = useState({
-    dayStartHour: 7,
-    dayEndHour: 22,
-    hidePastEvents: false,
-    defaultView: "day",
-  })
-  const [activeView, setActiveView] = useState("day")
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
+  const [date, setDate] = useState<Date | undefined>(new Date())
 
-  // Load settings and calendar data on component mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const savedUrl = (await getSetting("ics_url")) || ""
-        let savedSettings
+  // Sample events data
+  const events = [
+    {
+      id: 1,
+      title: "SAT Exam",
+      date: "2023-11-15",
+      startTime: "08:00",
+      endTime: "12:00",
+      type: "academic",
+      description: "SAT examination at Central High School",
+    },
+    {
+      id: 2,
+      title: "Congressional Nomination Interview",
+      date: "2023-11-20",
+      startTime: "14:00",
+      endTime: "15:00",
+      type: "application",
+      description: "Interview with Congressman Smith's office",
+    },
+    {
+      id: 3,
+      title: "Physical Fitness Training",
+      date: "2023-11-10",
+      startTime: "16:00",
+      endTime: "18:00",
+      type: "fitness",
+      description: "CFA preparation with Coach Johnson",
+    },
+  ]
 
-        try {
-          savedSettings = await getScheduleSettings()
-        } catch (settingsError) {
-          console.error("Error loading schedule settings:", settingsError)
-          savedSettings = {
-            dayStartHour: 7,
-            dayEndHour: 22,
-            hidePastEvents: false,
-            defaultView: "day",
-            categories: [],
-          }
-        }
-
-        setCalendarUrl(savedUrl)
-        setSettings(savedSettings)
-        setActiveView(savedSettings.defaultView)
-
-        await loadCalendarData()
-      } catch (err) {
-        console.error("Error loading settings:", err)
-        setError("Failed to load settings. Please try again.")
-        setLoading(false)
-      }
-    }
-
-    loadSettings()
-  }, [])
-
-  const loadCalendarData = async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const events = await fetchCalendarEvents()
-      setEvents(events)
-    } catch (err) {
-      console.error("Error fetching calendar:", err)
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch calendar data. Please check the URL and try again.",
-      )
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
-
-  // Save calendar URL
-  const handleSaveUrl = async () => {
-    try {
-      setLoading(true)
-      await saveIcsUrl(calendarUrl)
-
-      toast({
-        title: "Success",
-        description: "Calendar URL saved successfully",
-      })
-      setShowSettings(false)
-      await loadCalendarData()
-    } catch (err) {
-      console.error("Error saving URL:", err)
-      toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : "Failed to save calendar URL",
-        variant: "destructive",
-      })
-      setError(err instanceof Error ? err.message : "Failed to save calendar URL")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Save calendar settings
-  const handleSaveSettings = async () => {
-    try {
-      const result = await saveScheduleSettings(settings)
-
-      if (!result.success) {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to save settings",
-          variant: "destructive",
-        })
-      } else {
-        toast({
-          title: "Success",
-          description: "Settings saved successfully",
-        })
-        setShowSettings(false)
-        await loadCalendarData()
-      }
-    } catch (err) {
-      console.error("Error saving settings:", err)
-      toast({
-        title: "Error",
-        description: "Failed to save settings",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Handle refresh
-  const handleRefresh = async () => {
-    setRefreshing(true)
-    await loadCalendarData()
-  }
-
-  // Navigation functions
-  const goToToday = () => setCurrentDate(new Date())
-  const goToPrevious = () => {
-    if (activeView === "day") {
-      setCurrentDate(subDays(currentDate, 1))
-    } else if (activeView === "week") {
-      setCurrentDate(subDays(currentDate, 7))
-    }
-  }
-  const goToNext = () => {
-    if (activeView === "day") {
-      setCurrentDate(addDays(currentDate, 1))
-    } else if (activeView === "week") {
-      setCurrentDate(addDays(currentDate, 7))
-    }
-  }
-
-  // Filter events for the current view
-  const getFilteredEvents = () => {
-    if (!events.length) return []
-
-    let filteredEvents = [...events]
-
-    // Apply hide past events filter if enabled
-    if (settings.hidePastEvents) {
-      const now = new Date()
-      filteredEvents = filteredEvents.filter((event) => {
-        const endDate = parseISO(event.end)
-        return isBefore(now, endDate)
-      })
-    }
-
-    // Filter for day view
-    if (activeView === "day") {
-      return filteredEvents.filter((event) => {
-        const eventDate = parseISO(event.start)
-        return isSameDay(eventDate, currentDate)
-      })
-    }
-
-    // Filter for week view
-    if (activeView === "week") {
-      const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 })
-      const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 })
-
-      return filteredEvents.filter((event) => {
-        const eventDate = parseISO(event.start)
-        return (
-          (eventDate >= weekStart && eventDate <= weekEnd) ||
-          (parseISO(event.end) >= weekStart && parseISO(event.end) <= weekEnd)
-        )
-      })
-    }
-
-    // For agenda view, return all events sorted by date
-    return filteredEvents.sort((a, b) => {
-      return parseISO(a.start).getTime() - parseISO(b.start).getTime()
-    })
-  }
-
-  // Generate time slots for day view
-  const getTimeSlots = () => {
-    const slots = []
-    for (let hour = settings.dayStartHour; hour <= settings.dayEndHour; hour++) {
-      slots.push(hour)
-    }
-    return slots
-  }
-
-  // Get days for week view
-  const getWeekDays = () => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 })
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 })
-    return eachDayOfInterval({ start: weekStart, end: weekEnd })
-  }
-
-  // Group events by date for agenda view
-  const getGroupedEvents = () => {
-    const filteredEvents = getFilteredEvents()
-    const grouped: { [key: string]: CalendarEvent[] } = {}
-
-    filteredEvents.forEach((event) => {
-      const dateKey = format(parseISO(event.start), "yyyy-MM-dd")
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = []
-      }
-      grouped[dateKey].push(event)
-    })
-
-    return Object.entries(grouped)
-      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
-      .map(([date, events]) => ({
-        date: parseISO(date),
-        events,
-      }))
-  }
-
-  // Render event card
-  const renderEventCard = (event: CalendarEvent) => {
-    const startDate = parseISO(event.start)
-    const endDate = parseISO(event.end)
-    const isPast = isBefore(endDate, new Date())
-
-    return (
-      <div
-        key={event.id}
-        className={`p-2 mb-2 rounded-md cursor-pointer transition-colors ${
-          isPast ? "bg-muted/50" : "bg-primary/10 hover:bg-primary/20"
-        }`}
-        onClick={() => setSelectedEvent(event)}
-      >
-        <div className="flex justify-between items-start">
-          <div className="font-medium">{event.title}</div>
-          <div className="text-xs text-muted-foreground">
-            {format(startDate, "h:mm a")} - {format(endDate, "h:mm a")}
-          </div>
-        </div>
-        {event.location && <div className="text-xs text-muted-foreground mt-1">📍 {event.location}</div>}
-        {event.categories && event.categories.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {event.categories.map((category) => (
-              <Badge key={category} variant="outline" className="text-xs">
-                {category}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
+  // Get events for the selected date
+  const selectedDateStr = date ? format(date, "yyyy-MM-dd") : ""
+  const eventsForSelectedDate = events.filter((event) => event.date === selectedDateStr)
 
   return (
-    <div className="container mx-auto py-4">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Schedule</h1>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={() => setShowSettings(!showSettings)}>
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
-          <Button variant="outline" size="sm" onClick={goToToday}>
-            Today
-          </Button>
-          <Button variant="outline" size="icon" onClick={goToPrevious}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={goToNext}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Schedule</h1>
+        <p className="text-muted-foreground">Manage your calendar and important dates</p>
       </div>
 
-      {error && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <Tabs defaultValue="calendar" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
+          <TabsTrigger value="events">Events</TabsTrigger>
+          <TabsTrigger value="import">Import</TabsTrigger>
+        </TabsList>
 
-      {showSettings ? (
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle>Calendar Settings</CardTitle>
-            <CardDescription>Configure your calendar display preferences</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="calendar-url">iCalendar URL</Label>
-                <Input
-                  id="calendar-url"
-                  placeholder="https://calendar.google.com/calendar/ical/..."
-                  value={calendarUrl}
-                  onChange={(e) => setCalendarUrl(e.target.value)}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Paste your iCalendar URL from Google Calendar, Outlook, or other calendar services
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="day-start">Day Start Hour</Label>
-                  <Select
-                    value={settings.dayStartHour.toString()}
-                    onValueChange={(value) => setSettings({ ...settings, dayStartHour: Number.parseInt(value) })}
-                  >
-                    <SelectTrigger id="day-start">
-                      <SelectValue placeholder="Select start hour" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 24 }, (_, i) => (
-                        <SelectItem key={i} value={i.toString()}>
-                          {i === 0 ? '12 AM" : i &lt; 12 ? `${i} AM` : i === 12 ? "12 PM' : `${i - 12} PM`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="day-end">Day End Hour</Label>
-                  <Select
-                    value={settings.dayEndHour.toString()}
-                    onValueChange={(value) => setSettings({ ...settings, dayEndHour: Number.parseInt(value) })}
-                  >
-                    <SelectTrigger id="day-end">
-                      <SelectValue placeholder="Select end hour" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 24 }, (_, i) => (
-                        <SelectItem key={i} value={i.toString()}>
-                          {i === 0 ? "12 AM" : i < 12 ? `${i} AM` : i === 12 ? "12 PM" : `${i - 12} PM`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="hide-past"
-                  checked={settings.hidePastEvents}
-                  onCheckedChange={(checked) => setSettings({ ...settings, hidePastEvents: checked })}
-                />
-                <Label htmlFor="hide-past">Hide past events</Label>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="default-view">Default View</Label>
-                <Select
-                  value={settings.defaultView}
-                  onValueChange={(value) => setSettings({ ...settings, defaultView: value })}
-                >
-                  <SelectTrigger id="default-view">
-                    <SelectValue placeholder="Select default view" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Day</SelectItem>
-                    <SelectItem value="week">Week</SelectItem>
-                    <SelectItem value="agenda">Agenda</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button variant="outline" onClick={() => setShowSettings(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveUrl} disabled={loading}>
-                  {loading ? "Saving..." : "Save URL"}
-                </Button>
-                <Button onClick={handleSaveSettings} disabled={loading}>
-                  {loading ? "Saving..." : "Save Settings"}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <Card className="mb-4">
-            <CardHeader className="pb-2">
-              <CardTitle>
-                {activeView === "day" && format(currentDate, "EEEE, MMMM d, yyyy")}
-                {activeView === "week" &&
-                  `Week of ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "MMMM d")} - ${format(endOfWeek(currentDate, { weekStartsOn: 0 }), "MMMM d, yyyy")}`}
-                {activeView === "agenda" && "Upcoming Events"}
-              </CardTitle>
-              <CardDescription>
-                {calendarUrl ? (
-                  <div className="flex items-center">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    <span>Calendar connected</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ml-2 h-6 px-2"
-                      onClick={handleRefresh}
-                      disabled={refreshing}
-                    >
-                      <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? "animate-spin" : ""}`} />
-                      {refreshing ? "Refreshing..." : "Refresh"}
-                    </Button>
-                  </div>
-                ) : (
-                  <span className="text-yellow-500">No calendar connected. Open settings to add your calendar.</span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="day">Day</TabsTrigger>
-                  <TabsTrigger value="week">Week</TabsTrigger>
-                  <TabsTrigger value="agenda">Agenda</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="day" className="mt-4">
-                  {loading ? (
-                    <div className="space-y-4">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="flex">
-                          <Skeleton className="h-16 w-20 rounded-md" />
-                          <Skeleton className="h-16 w-full ml-2 rounded-md" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : getFilteredEvents().length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">No events scheduled for this day</div>
-                  ) : (
-                    <ScrollArea className="h-[calc(100vh-300px)]">
-                      <div className="space-y-1">
-                        {getTimeSlots().map((hour) => {
-                          const hourEvents = getFilteredEvents().filter((event) => {
-                            const eventStart = parseISO(event.start)
-                            const eventEnd = parseISO(event.end)
-                            return (
-                              eventStart.getHours() === hour ||
-                              (eventStart.getHours() < hour && eventEnd.getHours() > hour)
-                            )
-                          })
-
-                          return (
-                            <div key={hour} className="flex min-h-[60px]">
-                              <div className="w-20 text-sm text-muted-foreground pt-2 pr-4 text-right">
-                                {hour === 0
-                                  ? "12 AM"
-                                  : hour < 12
-                                    ? `${hour} AM`
-                                    : hour === 12
-                                      ? "12 PM"
-                                      : `${hour - 12} PM`}
-                              </div>
-                              <div className="flex-1 border-t pt-2">
-                                {hourEvents.map((event) => renderEventCard(event))}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="week" className="mt-4">
-                  {loading ? (
-                    <div className="space-y-4">
-                      <Skeleton className="h-8 w-full rounded-md" />
-                      <div className="grid grid-cols-7 gap-2">
-                        {Array.from({ length: 7 }).map((_, i) => (
-                          <Skeleton key={i} className="h-40 rounded-md" />
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="grid grid-cols-7 gap-2 mb-2">
-                        {getWeekDays().map((day) => (
-                          <div
-                            key={day.toString()}
-                            className={`text-center p-2 rounded-md ${
-                              isToday(day) ? "bg-primary text-primary-foreground" : ""
-                            }`}
-                          >
-                            <div className="text-sm font-medium">{format(day, "EEE")}</div>
-                            <div className="text-2xl">{format(day, "d")}</div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <ScrollArea className="h-[500px]">
-                        <div className="grid grid-cols-7 gap-2">
-                          {getWeekDays().map((day) => {
-                            const dayEvents = getFilteredEvents().filter((event) => {
-                              const eventDate = parseISO(event.start)
-                              return isSameDay(eventDate, day)
-                            })
-
-                            return (
-                              <div key={day.toString()} className="border rounded-md p-2 min-h-[500px]">
-                                {dayEvents.length === 0 ? (
-                                  <div className="text-center text-xs text-muted-foreground h-full flex items-center justify-center">
-                                    No events
-                                  </div>
-                                ) : (
-                                  <div className="space-y-1">{dayEvents.map((event) => renderEventCard(event))}</div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="agenda" className="mt-4">
-                  {loading ? (
-                    <div className="space-y-4">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Skeleton key={i} className="h-20 w-full rounded-md" />
-                      ))}
-                    </div>
-                  ) : getGroupedEvents().length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">No upcoming events</div>
-                  ) : (
-                    <ScrollArea className="h-[calc(100vh-300px)]">
-                      <div className="space-y-6">
-                        {getGroupedEvents().map((group) => (
-                          <div key={group.date.toString()}>
-                            <h3 className="text-sm font-medium mb-2 sticky top-0 bg-background py-1">
-                              {isToday(group.date) ? "Today" : format(group.date, "EEEE, MMMM d, yyyy")}
-                            </h3>
-                            <div className="space-y-2">{group.events.map((event) => renderEventCard(event))}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-
-          {selectedEvent && (
+        <TabsContent value="calendar" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-[1fr_300px]">
             <Card>
               <CardHeader>
-                <CardTitle>{selectedEvent.title}</CardTitle>
-                <CardDescription>{format(parseISO(selectedEvent.start), "EEEE, MMMM d, yyyy")}</CardDescription>
+                <CardTitle>Calendar</CardTitle>
+                <CardDescription>View and manage your schedule</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start">
-                    <div className="w-20 flex-shrink-0 text-muted-foreground">Time:</div>
-                    <div>
-                      {format(parseISO(selectedEvent.start), "h:mm a")} -{" "}
-                      {format(parseISO(selectedEvent.end), "h:mm a")}
-                      {selectedEvent.allDay && " (All day)"}
-                    </div>
-                  </div>
-
-                  {selectedEvent.location && (
-                    <div className="flex items-start">
-                      <div className="w-20 flex-shrink-0 text-muted-foreground">Location:</div>
-                      <div>{selectedEvent.location}</div>
-                    </div>
-                  )}
-
-                  {selectedEvent.description && (
-                    <div className="flex items-start">
-                      <div className="w-20 flex-shrink-0 text-muted-foreground">Details:</div>
-                      <div className="whitespace-pre-wrap">{selectedEvent.description}</div>
-                    </div>
-                  )}
-
-                  {selectedEvent.categories && selectedEvent.categories.length > 0 && (
-                    <div className="flex items-start">
-                      <div className="w-20 flex-shrink-0 text-muted-foreground">Category:</div>
-                      <div className="flex flex-wrap gap-1">
-                        {selectedEvent.categories.map((category) => (
-                          <Badge key={category} variant="secondary" className="text-xs">
-                            {category}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedEvent.url && (
-                    <div className="flex items-start">
-                      <div className="w-20 flex-shrink-0 text-muted-foreground">Link:</div>
-                      <a
-                        href={selectedEvent.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        Open event details
-                      </a>
-                    </div>
-                  )}
-                </div>
+              <CardContent className="p-0">
+                <Calendar mode="single" selected={date} onSelect={setDate} className="rounded-md border" />
               </CardContent>
             </Card>
-          )}
-        </>
-      )}
+
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Events for {date ? format(date, "MMMM d, yyyy") : "Today"}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {eventsForSelectedDate.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No events scheduled for this day.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {eventsForSelectedDate.map((event) => (
+                        <div key={event.id} className="flex flex-col space-y-1 rounded-lg border p-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium">{event.title}</h4>
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-1 text-xs font-medium",
+                                event.type === "academic"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : event.type === "application"
+                                    ? "bg-purple-100 text-purple-800"
+                                    : "bg-orange-100 text-orange-800",
+                              )}
+                            >
+                              {event.type}
+                            </span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {event.startTime} - {event.endTime}
+                          </div>
+                          <p className="text-sm">{event.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+                <CardFooter>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button className="w-full">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Event
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New Event</DialogTitle>
+                        <DialogDescription>Create a new event for your schedule</DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <FormLabel htmlFor="title">Title</FormLabel>
+                          <Input id="title" placeholder="Event title" />
+                        </div>
+                        <div className="grid gap-2">
+                          <FormLabel htmlFor="date">Date</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {date ? format(date, "PPP") : "Select date"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="grid gap-2">
+                            <FormLabel htmlFor="start-time">Start Time</FormLabel>
+                            <Input id="start-time" type="time" defaultValue="09:00" />
+                          </div>
+                          <div className="grid gap-2">
+                            <FormLabel htmlFor="end-time">End Time</FormLabel>
+                            <Input id="end-time" type="time" defaultValue="10:00" />
+                          </div>
+                        </div>
+                        <div className="grid gap-2">
+                          <FormLabel htmlFor="type">Event Type</FormLabel>
+                          <Select>
+                            <SelectTrigger id="type">
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="academic">Academic</SelectItem>
+                              <SelectItem value="application">Application</SelectItem>
+                              <SelectItem value="fitness">Fitness</SelectItem>
+                              <SelectItem value="personal">Personal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <FormLabel htmlFor="description">Description</FormLabel>
+                          <Textarea id="description" placeholder="Event details" />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit">Save Event</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </CardFooter>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Upcoming Events</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {events
+                      .sort((a, b) => a.date.localeCompare(b.date))
+                      .slice(0, 3)
+                      .map((event) => (
+                        <div key={event.id} className="flex justify-between text-sm">
+                          <span>{event.title}</span>
+                          <span className="text-muted-foreground">{format(new Date(event.date), "MMM d")}</span>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="events" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>All Events</CardTitle>
+                <CardDescription>View and manage all your scheduled events</CardDescription>
+              </div>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Event
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Event</DialogTitle>
+                    <DialogDescription>Create a new event for your schedule</DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <FormLabel htmlFor="title">Title</FormLabel>
+                      <Input id="title" placeholder="Event title" />
+                    </div>
+                    <div className="grid gap-2">
+                      <FormLabel htmlFor="date">Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start text-left font-normal">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {date ? format(date, "PPP") : "Select date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <FormLabel htmlFor="start-time">Start Time</FormLabel>
+                        <Input id="start-time" type="time" defaultValue="09:00" />
+                      </div>
+                      <div className="grid gap-2">
+                        <FormLabel htmlFor="end-time">End Time</FormLabel>
+                        <Input id="end-time" type="time" defaultValue="10:00" />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <FormLabel htmlFor="type">Event Type</FormLabel>
+                      <Select>
+                        <SelectTrigger id="type">
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="academic">Academic</SelectItem>
+                          <SelectItem value="application">Application</SelectItem>
+                          <SelectItem value="fitness">Fitness</SelectItem>
+                          <SelectItem value="personal">Personal</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <FormLabel htmlFor="description">Description</FormLabel>
+                      <Textarea id="description" placeholder="Event details" />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit">Save Event</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {events.map((event) => (
+                  <div key={event.id} className="flex flex-col space-y-2 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium">{event.title}</h3>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-1 text-xs font-medium",
+                          event.type === "academic"
+                            ? "bg-blue-100 text-blue-800"
+                            : event.type === "application"
+                              ? "bg-purple-100 text-purple-800"
+                              : "bg-orange-100 text-orange-800",
+                        )}
+                      >
+                        {event.type}
+                      </span>
+                    </div>
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      <span>
+                        {format(new Date(event.date), "MMMM d, yyyy")} • {event.startTime} - {event.endTime}
+                      </span>
+                    </div>
+                    <p className="text-sm">{event.description}</p>
+                    <div className="flex justify-end space-x-2">
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                      <Button variant="destructive" size="sm">
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="import" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import Calendar</CardTitle>
+              <CardDescription>Import events from external calendars</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <FormLabel>Import from Google Calendar</FormLabel>
+                <Button variant="outline" className="w-full">
+                  Connect Google Calendar
+                </Button>
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Import from iCalendar URL</FormLabel>
+                <div className="flex space-x-2">
+                  <Input placeholder="Enter iCalendar URL" />
+                  <Button>Import</Button>
+                </div>
+                <FormDescription>Enter a valid iCalendar URL to import events</FormDescription>
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Upload iCalendar File</FormLabel>
+                <div className="flex space-x-2">
+                  <Input type="file" accept=".ics" />
+                  <Button>Upload</Button>
+                </div>
+                <FormDescription>Upload an .ics file to import events</FormDescription>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
