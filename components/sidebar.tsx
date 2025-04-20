@@ -150,8 +150,10 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
       const mobile = window.innerWidth < 768
       setIsMobile(mobile)
       // On mobile, sidebar should be closed by default
-      if (mobile && isOpen) {
+      if (mobile) {
         setIsOpen(false)
+      } else {
+        setIsOpen(true)
       }
     }
 
@@ -266,7 +268,7 @@ export function Sidebar() {
     <aside
       className={cn(
         "fixed inset-y-0 left-0 z-20 flex w-64 flex-col border-r bg-background transition-all duration-300",
-        isOpen ? "translate-x-0" : "-translate-x-full md:w-16 md:translate-x-0",
+        isOpen ? "md:w-64 translate-x-0" : "md:w-16 -translate-x-0",
       )}
     >
       {sidebarContent}
