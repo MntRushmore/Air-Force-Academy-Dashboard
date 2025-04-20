@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { ReactNode } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -20,7 +21,7 @@ import {
   PenTool,
   Settings,
   Target,
-  TimerIcon,
+  Timer,
   Users,
 } from "lucide-react"
 
@@ -85,7 +86,7 @@ const routes = [
   },
   {
     label: "Pomodoro",
-    icon: TimerIcon,
+    icon: Timer,
     href: "/pomodoro",
   },
   {
@@ -140,7 +141,7 @@ const routes = [
   },
 ]
 
-export function SidebarProvider({ children }: { children: React.ReactNode }) {
+export function SidebarProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = React.useState(true)
   const [isMobile, setIsMobile] = React.useState(false)
 
@@ -241,7 +242,7 @@ export function Sidebar() {
           <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
             <span className="text-sm font-medium">US</span>
           </div>
-          {(isOpen || isMobile) && (
+          {isOpen && (
             <div className="flex flex-col">
               <span className="text-sm font-medium">USAFA Applicant</span>
               <span className="text-xs text-muted-foreground">applicant@example.com</span>
