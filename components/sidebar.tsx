@@ -54,6 +54,11 @@ const routes = [
     href: "/",
   },
   {
+    label: "Courses",
+    icon: BookOpen,
+    href: "/courses",
+  },
+  {
     label: "Schedule",
     icon: Calendar,
     href: "/schedule",
