@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   BookOpen,
   Calendar,
@@ -16,7 +16,7 @@ import {
   Target,
   Users,
   Dumbbell,
-} from "lucide-react"
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -27,17 +27,22 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 export function AppSidebar() {
-  const { open, setIsOpen, isMobile } = useSidebar()
-  const pathname = usePathname()
+  const { open, setIsOpen, isMobile } = useSidebar();
+  const pathname = usePathname();
 
   const routes = [
     {
       label: "Dashboard",
       icon: Home,
-      href: "/",
+      href: "/dashboard",
+    },
+    {
+      label: "Courses",
+      icon: BookOpen,
+      href: "/courses",
     },
     {
       label: "Schedule",
@@ -114,7 +119,7 @@ export function AppSidebar() {
       icon: Settings,
       href: "/settings",
     },
-  ]
+  ];
 
   return (
     <Sidebar>
@@ -128,8 +133,15 @@ export function AppSidebar() {
         <SidebarMenu>
           {routes.map((route) => (
             <SidebarMenuItem key={route.href}>
-              <SidebarMenuButton asChild isActive={pathname === route.href} tooltip={route.label}>
-                <Link href={route.href} onClick={() => isMobile && setIsOpen(false)}>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === route.href}
+                tooltip={route.label}
+              >
+                <Link
+                  href={route.href}
+                  onClick={() => isMobile && setIsOpen(false)}
+                >
                   <route.icon className="h-4 w-4" />
                   <span>{route.label}</span>
                 </Link>
@@ -139,8 +151,10 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="border-t p-2">
-        <div className="text-xs text-muted-foreground">USAFA Dashboard v1.0</div>
+        <div className="text-xs text-muted-foreground">
+          USAFA Dashboard v1.0
+        </div>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

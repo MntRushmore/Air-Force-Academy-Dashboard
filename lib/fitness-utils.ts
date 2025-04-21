@@ -1,98 +1,100 @@
-import type { Exercise } from "@/lib/db"
+export interface CFAStandard {
+  min: number;
+  max: number;
+  unit: string;
+  isReversed?: boolean;
+}
+
+export interface Exercise {
+  id: string;
+  user_id: string;
+  exercise_type: string;
+  value: number;
+  target_value: number;
+  unit: string;
+  date: string;
+  created_at: string;
+}
 
 // CFA standards for males
-export const cfaStandardsMale = {
+export const cfaStandardsMale: Record<string, CFAStandard> = {
   "Basketball Throw": { min: 60, max: 102, unit: "feet" },
   "Pull-ups": { min: 7, max: 18, unit: "reps" },
-  "Shuttle Run": { min: 8.1, max: 7.1, unit: "seconds", isReversed: true },
-  Crunches: { min: 58, max: 95, unit: "reps" },
-  "Push-ups": { min: 35, max: 75, unit: "reps" },
-  "1-Mile Run": { min: 7.3, max: 5.2, unit: "minutes", isReversed: true },
-}
+  "Shuttle Run": { min: 8.1, max: 7.8, unit: "seconds", isReversed: true },
+  Crunches: { min: 58, max: 81, unit: "reps" },
+  "Push-ups": { min: 42, max: 75, unit: "reps" },
+  "1-Mile Run": { min: 420, max: 330, unit: "seconds", isReversed: true },
+};
 
 // CFA standards for females
-export const cfaStandardsFemale = {
+export const cfaStandardsFemale: Record<string, CFAStandard> = {
   "Basketball Throw": { min: 40, max: 66, unit: "feet" },
-  "Pull-ups": { min: 1, max: 7, unit: "reps" },
-  "Shuttle Run": { min: 9.1, max: 7.8, unit: "seconds", isReversed: true },
-  Crunches: { min: 50, max: 95, unit: "reps" },
-  "Push-ups": { min: 18, max: 41, unit: "reps" },
-  "1-Mile Run": { min: 8.3, max: 6.0, unit: "minutes", isReversed: true },
-}
+  "Pull-ups": { min: 3, max: 7, unit: "reps" },
+  "Shuttle Run": { min: 9.4, max: 8.6, unit: "seconds", isReversed: true },
+  Crunches: { min: 58, max: 81, unit: "reps" },
+  "Push-ups": { min: 19, max: 40, unit: "reps" },
+  "1-Mile Run": { min: 510, max: 420, unit: "seconds", isReversed: true },
+};
 
 // Calculate CFA score based on exercises and gender
-export function calculateCFAScore(exercises: Exercise[], gender: "male" | "female" = "male"): number {
-  if (exercises.length === 0) return 0
+export function calculateCFAScore(
+  exercises: Exercise[],
+  gender: "male" | "female"
+): number {
+  if (!exercises.length) return 0;
 
-  const cfaExercises = ["Basketball Throw", "Pull-ups", "Shuttle Run", "Crunches", "Push-ups", "1-Mile Run"]
-  const cfaStandards = gender === "male" ? cfaStandardsMale : cfaStandardsFemale
-
-  let totalScore = 0
-  let exerciseCount = 0
-
-  for (const exerciseName of cfaExercises) {
-    const exercise = exercises.find((e) => e.name === exerciseName)
-    if (!exercise) continue
-
-    const standard = cfaStandards[exerciseName as keyof typeof cfaStandards]
-    if (!standard) continue
-
-    let score = 0
-    if (standard.isReversed) {
-      // Lower is better (e.g., run time)
-      if (exercise.current <= standard.max) score = 100
-      else if (exercise.current >= standard.min) score = 0
-      else {
-        score = 100 - ((exercise.current - standard.max) / (standard.min - standard.max)) * 100
-      }
-    } else {
-      // Higher is better (e.g., push-ups)
-      if (exercise.current >= standard.max) score = 100
-      else if (exercise.current <= standard.min) score = 0
-      else {
-        score = ((exercise.current - standard.min) / (standard.max - standard.min)) * 100
-      }
+  // Get the latest record for each exercise type
+  const latestExercises = exercises.reduce((acc, curr) => {
+    if (
+      !acc[curr.exercise_type] ||
+      new Date(curr.date) > new Date(acc[curr.exercise_type].date)
+    ) {
+      acc[curr.exercise_type] = curr;
     }
+    return acc;
+  }, {} as Record<string, Exercise>);
 
-    totalScore += score
-    exerciseCount++
-  }
+  // Calculate total score
+  let totalScore = 0;
+  let exerciseCount = 0;
 
-  return exerciseCount > 0 ? Math.round(totalScore / exerciseCount) : 0
+  Object.values(latestExercises).forEach((exercise) => {
+    const { score } = calculateExerciseProgress(exercise, gender);
+    totalScore += score;
+    exerciseCount++;
+  });
+
+  return exerciseCount ? Math.round(totalScore / exerciseCount) : 0;
 }
 
 // Calculate progress for a single exercise
 export function calculateExerciseProgress(
   exercise: Exercise,
-  gender: "male" | "female" = "male",
-): {
-  percentage: number
-  score: number
-} {
-  const cfaStandards = gender === "male" ? cfaStandardsMale : cfaStandardsFemale
-  const standard = cfaStandards[exercise.name as keyof typeof cfaStandards]
+  gender: "male" | "female"
+): { percentage: number; score: number } {
+  const standards = gender === "male" ? cfaStandardsMale : cfaStandardsFemale;
+  const standard = standards[exercise.exercise_type];
 
-  if (!standard) return { percentage: (exercise.current / exercise.target) * 100, score: 0 }
+  if (!standard) {
+    return { percentage: 0, score: 0 };
+  }
 
-  let score = 0
+  let percentage: number;
   if (standard.isReversed) {
-    // Lower is better (e.g., run time)
-    if (exercise.current <= standard.max) score = 100
-    else if (exercise.current >= standard.min) score = 0
-    else {
-      score = 100 - ((exercise.current - standard.max) / (standard.min - standard.max)) * 100
-    }
+    // Lower is better (like running time)
+    percentage =
+      ((standard.min - exercise.value) / (standard.min - standard.max)) * 100;
   } else {
-    // Higher is better (e.g., push-ups)
-    if (exercise.current >= standard.max) score = 100
-    else if (exercise.current <= standard.min) score = 0
-    else {
-      score = ((exercise.current - standard.min) / (standard.max - standard.min)) * 100
-    }
+    // Higher is better
+    percentage =
+      ((exercise.value - standard.min) / (standard.max - standard.min)) * 100;
   }
 
-  return {
-    percentage: Math.min(100, Math.max(0, (exercise.current / exercise.target) * 100)),
-    score: Math.round(score),
-  }
+  // Clamp percentage between 0 and 100
+  percentage = Math.max(0, Math.min(100, percentage));
+
+  // Calculate score (0-100)
+  const score = Math.round(percentage);
+
+  return { percentage, score };
 }
