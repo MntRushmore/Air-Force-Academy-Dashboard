@@ -1,36 +1,79 @@
-import type { Course, Grade } from "@/lib/db"
+import type { Course, Grade } from "@/lib/types";
+import { type Database } from "./database.types";
+
+type DatabaseGrade = Database["public"]["Tables"]["grades"]["Row"];
+
+// Extended Grade type with additional fields needed for analysis
+export interface ExtendedGrade {
+  id: string;
+  user_id: string;
+  date: string;
+  grade_type: string;
+  grade_value: number;
+  subject: string;
+  created_at: string;
+  score: number;
+  max_score: number;
+  weight: number;
+  course_id: string;
+  is_final: boolean | null;
+}
+
+// Helper function to convert frontend Grade to ExtendedGrade
+export function convertToExtendedGrade(grade: Grade): ExtendedGrade {
+  return {
+    id: grade.id,
+    user_id: "", // This will be filled by the database
+    date: grade.date || new Date().toISOString().split("T")[0],
+    grade_type: grade.type,
+    grade_value: grade.score,
+    subject: grade.courseId,
+    created_at: grade.created_at,
+    score: grade.score,
+    max_score: grade.maxScore,
+    weight: grade.weight,
+    course_id: grade.courseId,
+    is_final: grade.is_final ?? null,
+  };
+}
 
 // Calculate average grade for a course
-export function calculateCourseAverage(grades: Grade[]): number {
-  if (grades.length === 0) return 0
+export function calculateCourseAverage(grades: ExtendedGrade[]): number {
+  if (grades.length === 0) return 0;
 
-  let weightedSum = 0
-  let weightSum = 0
+  // Filter out non-final grades and undefined values
+  const finalGrades = grades.filter(
+    (grade) => grade.is_final !== false && grade.is_final !== undefined
+  );
 
-  for (const grade of grades) {
-    const percentage = (grade.score / grade.maxScore) * 100
-    weightedSum += percentage * grade.weight
-    weightSum += grade.weight
+  if (finalGrades.length === 0) return 0;
+
+  let weightedSum = 0;
+  let weightSum = 0;
+
+  for (const grade of finalGrades) {
+    const percentage = (grade.score / grade.max_score) * 100;
+    weightedSum += percentage * grade.weight;
+    weightSum += grade.weight;
   }
 
-  return weightSum > 0 ? weightedSum / weightSum : 0
+  return weightSum > 0 ? weightedSum / weightSum : 0;
 }
 
 // Convert percentage to letter grade
 export function percentageToLetterGrade(percentage: number): string {
-  if (percentage >= 97) return "A+"
-  if (percentage >= 93) return "A"
-  if (percentage >= 90) return "A-"
-  if (percentage >= 87) return "B+"
-  if (percentage >= 83) return "B"
-  if (percentage >= 80) return "B-"
-  if (percentage >= 77) return "C+"
-  if (percentage >= 73) return "C"
-  if (percentage >= 70) return "C-"
-  if (percentage >= 67) return "D+"
-  if (percentage >= 63) return "D"
-  if (percentage >= 60) return "D-"
-  return "F"
+  if (percentage >= 93) return "A";
+  if (percentage >= 90) return "A-";
+  if (percentage >= 87) return "B+";
+  if (percentage >= 83) return "B";
+  if (percentage >= 80) return "B-";
+  if (percentage >= 77) return "C+";
+  if (percentage >= 73) return "C";
+  if (percentage >= 70) return "C-";
+  if (percentage >= 67) return "D+";
+  if (percentage >= 63) return "D";
+  if (percentage >= 60) return "D-";
+  return "F";
 }
 
 // Convert letter grade to GPA points
@@ -49,33 +92,37 @@ export function letterGradeToPoints(letterGrade: string, isAP = false): number {
     D: 1.0,
     "D-": 0.7,
     F: 0.0,
-  }
+  };
 
-  const points = gradePoints[letterGrade] || 0
-  return isAP ? Math.min(4.0, points + 1.0) : points
+  const points = gradePoints[letterGrade] || 0;
+  return isAP ? Math.min(4.0, points + 1.0) : points;
 }
 
 // Group grades by grading period
-export function groupGradesByPeriod(grades: Grade[]): Record<string, Grade[]> {
-  const groupedGrades: Record<string, Grade[]> = {}
+export function groupGradesByPeriod(
+  grades: ExtendedGrade[]
+): Record<string, ExtendedGrade[]> {
+  const groupedGrades: Record<string, ExtendedGrade[]> = {};
 
   for (const grade of grades) {
     // Extract year-month from date for grouping
-    const dateParts = grade.date.split("-")
+    const dateParts = grade.date.split("-");
     if (dateParts.length >= 2) {
-      const period = `${dateParts[0]}-${dateParts[1]}`
+      const period = `${dateParts[0]}-${dateParts[1]}`;
       if (!groupedGrades[period]) {
-        groupedGrades[period] = []
+        groupedGrades[period] = [];
       }
-      groupedGrades[period].push(grade)
+      groupedGrades[period].push(grade);
     }
   }
 
-  return groupedGrades
+  return groupedGrades;
 }
 
 // Calculate grade distribution for a set of grades
-export function calculateGradeDistribution(grades: Grade[]): Record<string, number> {
+export function calculateGradeDistribution(
+  grades: ExtendedGrade[]
+): Record<string, number> {
   const distribution: Record<string, number> = {
     "A+": 0,
     A: 0,
@@ -90,162 +137,177 @@ export function calculateGradeDistribution(grades: Grade[]): Record<string, numb
     D: 0,
     "D-": 0,
     F: 0,
-  }
+  };
 
   for (const grade of grades) {
-    const percentage = (grade.score / grade.maxScore) * 100
-    const letterGrade = percentageToLetterGrade(percentage)
-    distribution[letterGrade]++
+    const percentage = (grade.score / grade.max_score) * 100;
+    const letterGrade = percentageToLetterGrade(percentage);
+    distribution[letterGrade]++;
   }
 
-  return distribution
+  return distribution;
+}
+
+interface GradeTrend {
+  period: string;
+  [courseId: string]: number | string;
 }
 
 // Calculate grade trends over time
 export function calculateGradeTrends(
-  courseGrades: Record<string, Grade[]>,
-  courses: Course[],
-): { period: string; [courseId: string]: number }[] {
-  const trends: { period: string; [courseId: string]: number }[] = []
-  const periods = Object.keys(courseGrades).sort()
+  grades: ExtendedGrade[],
+  courses: Course[]
+): GradeTrend[] {
+  // Group grades by period (month)
+  const gradesByPeriod = grades.reduce((acc, grade) => {
+    const defaultDate = new Date().toISOString();
+    const date = grade.date ?? defaultDate;
+    const period = new Date(date).toISOString().slice(0, 7); // YYYY-MM
+    if (!acc[period]) {
+      acc[period] = [];
+    }
+    acc[period].push(grade);
+    return acc;
+  }, {} as Record<string, ExtendedGrade[]>);
+
+  // Calculate averages for each period
+  const trends: GradeTrend[] = [];
+  const periods = Object.keys(gradesByPeriod).sort();
 
   for (const period of periods) {
-    const periodData: { period: string; [courseId: string]: number } = { period }
+    const periodData: GradeTrend = { period };
+    const periodGrades = gradesByPeriod[period];
 
     for (const course of courses) {
-      if (course.id) {
-        const courseGradesInPeriod = courseGrades[period]?.filter((g) => g.courseId === course.id) || []
-        const average = calculateCourseAverage(courseGradesInPeriod)
-        periodData[course.id] = average
+      const courseGrades = periodGrades.filter(
+        (g) => g.course_id === course.id
+      );
+      const average = calculateCourseAverage(courseGrades);
+      periodData[course.id] = average;
+    }
+
+    trends.push(periodData);
+  }
+
+  return trends;
+}
+
+// Get color based on grade percentage
+export function getGradeColor(percentage: number): string {
+  if (percentage >= 90) return "#22c55e"; // green-500
+  if (percentage >= 80) return "#3b82f6"; // blue-500
+  if (percentage >= 70) return "#f59e0b"; // amber-500
+  if (percentage >= 60) return "#ef4444"; // red-500
+  return "#6b7280"; // gray-500
+}
+
+interface ComparativeMetrics {
+  overallAverage: number;
+  highestGrade: { courseId: string; grade: number };
+  lowestGrade: { courseId: string; grade: number };
+  improvingCourses: string[];
+  needsAttentionCourses: string[];
+}
+
+// Calculate comparative metrics
+export function calculateComparativeMetrics(
+  grades: ExtendedGrade[],
+  courses: Course[]
+): ComparativeMetrics {
+  const metrics: ComparativeMetrics = {
+    overallAverage: 0,
+    highestGrade: { courseId: "", grade: 0 },
+    lowestGrade: { courseId: "", grade: 100 },
+    improvingCourses: [],
+    needsAttentionCourses: [],
+  };
+
+  let totalWeightedGrade = 0;
+  let totalCredits = 0;
+
+  for (const course of courses) {
+    const courseGrades = grades.filter((g) => g.course_id === course.id);
+    if (courseGrades.length === 0) continue;
+
+    const average = calculateCourseAverage(courseGrades);
+    totalWeightedGrade += average * course.credits;
+    totalCredits += course.credits;
+
+    // Track highest and lowest grades
+    if (average > metrics.highestGrade.grade) {
+      metrics.highestGrade = { courseId: course.id, grade: average };
+    }
+    if (average < metrics.lowestGrade.grade) {
+      metrics.lowestGrade = { courseId: course.id, grade: average };
+    }
+
+    // Check for improvement or need for attention
+    const recentGrades = courseGrades
+      .sort((a, b) => {
+        const defaultDate = new Date().toISOString();
+        const dateA = a.date ?? defaultDate;
+        const dateB = b.date ?? defaultDate;
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      })
+      .slice(0, 3);
+
+    if (recentGrades.length >= 2) {
+      const trend = recentGrades.reduce((acc, grade, i) => {
+        if (i === 0) return acc;
+        return (
+          acc +
+          (grade.score / grade.max_score -
+            recentGrades[i - 1].score / recentGrades[i - 1].max_score)
+        );
+      }, 0);
+
+      if (trend > 0) {
+        metrics.improvingCourses.push(course.id);
+      } else if (average < 70) {
+        metrics.needsAttentionCourses.push(course.id);
       }
     }
-
-    trends.push(periodData)
   }
 
-  return trends
-}
+  metrics.overallAverage =
+    totalCredits > 0 ? totalWeightedGrade / totalCredits : 0;
 
-// Get color for a specific grade
-export function getGradeColor(grade: string | number): string {
-  let letterGrade: string
-
-  if (typeof grade === "number") {
-    letterGrade = percentageToLetterGrade(grade)
-  } else {
-    letterGrade = grade
-  }
-
-  if (letterGrade.startsWith("A")) return "#4ade80" // green-400
-  if (letterGrade.startsWith("B")) return "#60a5fa" // blue-400
-  if (letterGrade.startsWith("C")) return "#facc15" // yellow-400
-  if (letterGrade.startsWith("D")) return "#fb923c" // orange-400
-  return "#f87171" // red-400
-}
-
-// Calculate comparative metrics between courses
-export function calculateComparativeMetrics(
-  courses: Course[],
-  allGrades: Grade[],
-): {
-  highestAverage: { course: Course; average: number } | null
-  lowestAverage: { course: Course; average: number } | null
-  mostImproved: { course: Course; improvement: number } | null
-  mostConsistent: { course: Course; stdDev: number } | null
-} {
-  if (courses.length === 0) {
-    return {
-      highestAverage: null,
-      lowestAverage: null,
-      mostImproved: null,
-      mostConsistent: null,
-    }
-  }
-
-  const courseMetrics = courses.map((course) => {
-    const courseGrades = allGrades.filter((g) => g.courseId === course.id)
-    const average = calculateCourseAverage(courseGrades)
-
-    // Calculate improvement (difference between earliest and latest grades)
-    const sortedGrades = [...courseGrades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-    let improvement = 0
-    if (sortedGrades.length >= 2) {
-      const earliest = (sortedGrades[0].score / sortedGrades[0].maxScore) * 100
-      const latest =
-        (sortedGrades[sortedGrades.length - 1].score / sortedGrades[sortedGrades.length - 1].maxScore) * 100
-      improvement = latest - earliest
-    }
-
-    // Calculate standard deviation for consistency
-    let stdDev = 0
-    if (courseGrades.length > 0) {
-      const percentages = courseGrades.map((g) => (g.score / g.maxScore) * 100)
-      const mean = percentages.reduce((sum, val) => sum + val, 0) / percentages.length
-      const squaredDiffs = percentages.map((val) => Math.pow(val - mean, 2))
-      stdDev = Math.sqrt(squaredDiffs.reduce((sum, val) => sum + val, 0) / percentages.length)
-    }
-
-    return { course, average, improvement, stdDev }
-  })
-
-  // Find highest and lowest averages
-  const sortedByAverage = [...courseMetrics].sort((a, b) => b.average - a.average)
-  const highestAverage =
-    sortedByAverage.length > 0 ? { course: sortedByAverage[0].course, average: sortedByAverage[0].average } : null
-  const lowestAverage =
-    sortedByAverage.length > 0
-      ? {
-          course: sortedByAverage[sortedByAverage.length - 1].course,
-          average: sortedByAverage[sortedByAverage.length - 1].average,
-        }
-      : null
-
-  // Find most improved
-  const sortedByImprovement = [...courseMetrics].sort((a, b) => b.improvement - a.improvement)
-  const mostImproved =
-    sortedByImprovement.length > 0
-      ? { course: sortedByImprovement[0].course, improvement: sortedByImprovement[0].improvement }
-      : null
-
-  // Find most consistent (lowest standard deviation)
-  const sortedByConsistency = [...courseMetrics].sort((a, b) => a.stdDev - b.stdDev)
-  const mostConsistent =
-    sortedByConsistency.length > 0
-      ? { course: sortedByConsistency[0].course, stdDev: sortedByConsistency[0].stdDev }
-      : null
-
-  return {
-    highestAverage,
-    lowestAverage,
-    mostImproved,
-    mostConsistent,
-  }
+  return metrics;
 }
 
 // Unified GPA calculation function for use across the application
-export function calculateGPA(courses: Course[], grades: Grade[]): number {
-  if (courses.length === 0) return 0
+export function calculateGPA(
+  courses: Course[],
+  grades: ExtendedGrade[]
+): number {
+  if (courses.length === 0) return 0;
 
-  let totalPoints = 0
-  let totalCredits = 0
-  let validCourses = 0
+  let totalPoints = 0;
+  let totalCredits = 0;
+  let validCourses = 0;
 
   for (const course of courses) {
-    if (!course.id) continue
+    if (!course.id) continue;
 
     // Calculate course grade
-    const courseGrades = grades.filter((g) => g.courseId === course.id)
-    if (courseGrades.length === 0) continue
+    const courseGrades = grades.filter((g) => g.course_id === course.id);
+    if (courseGrades.length === 0) continue;
 
-    const average = calculateCourseAverage(courseGrades)
-    const letterGrade = percentageToLetterGrade(average)
-    const gradePoints = letterGradeToPoints(letterGrade, course.isAP)
+    const average = calculateCourseAverage(courseGrades);
+    const letterGrade = percentageToLetterGrade(average);
+    const gradePoints = letterGradeToPoints(letterGrade, course.isAP);
 
-    totalPoints += gradePoints * course.credits
-    totalCredits += course.credits
-    validCourses++
+    totalPoints += gradePoints * course.credits;
+    totalCredits += course.credits;
+    validCourses++;
   }
 
-  return totalCredits > 0 ? Number.parseFloat((totalPoints / totalCredits).toFixed(2)) : 0
+  return totalCredits > 0
+    ? Number.parseFloat((totalPoints / totalCredits).toFixed(2))
+    : 0;
+}
+
+function calculateGradeWeight(grade: ExtendedGrade): number {
+  const isFinal = grade.is_final ?? false;
+  return isFinal ? 1 : 0.5;
 }

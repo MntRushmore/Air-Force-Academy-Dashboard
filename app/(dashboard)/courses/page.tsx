@@ -64,6 +64,7 @@ export default function CoursesPage() {
     credits: 3,
     semester: "Fall",
     year: new Date().getFullYear(),
+    grade: null,
     is_ap: false,
   });
 
@@ -122,13 +123,16 @@ export default function CoursesPage() {
 
       if (error) throw error;
 
-      setCourses([...courses, data[0] as Course]);
+      const newCourseData = data?.[0] as Course;
+      setCourses([...courses, newCourseData]);
+
       setNewCourse({
         name: "",
         code: "",
         credits: 3,
         semester: "Fall",
         year: new Date().getFullYear(),
+        grade: null,
         is_ap: false,
       });
       setIsAddDialogOpen(false);
@@ -525,6 +529,26 @@ export default function CoursesPage() {
                 required
               />
             </div>
+
+            {/* Add grade field */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="grade" className="text-right">
+                Grade
+              </Label>
+              <Input
+                id="grade"
+                value={newCourse.grade || ""}
+                onChange={(e) =>
+                  setNewCourse({
+                    ...newCourse,
+                    grade: e.target.value || null,
+                  })
+                }
+                className="col-span-3"
+                placeholder="Optional"
+              />
+            </div>
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="is-ap" className="text-right">
                 AP Course

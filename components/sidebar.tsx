@@ -124,11 +124,6 @@ const routes = [
     href: "/fitness",
   },
   {
-    label: "Timeline",
-    icon: Clock,
-    href: "/timeline",
-  },
-  {
     label: "Analytics",
     icon: BarChart3,
     href: "/analytics",

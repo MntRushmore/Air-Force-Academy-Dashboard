@@ -167,6 +167,8 @@ export type Database = {
           date: string;
           grade_type: string | null;
           grade_value: number | null;
+          max_score: number;
+          weight: number;
           id: string;
           subject: string;
           user_id: string;
@@ -176,6 +178,8 @@ export type Database = {
           date: string;
           grade_type?: string | null;
           grade_value?: number | null;
+          max_score?: number;
+          weight?: number;
           id?: string;
           subject: string;
           user_id: string;
@@ -185,6 +189,8 @@ export type Database = {
           date?: string;
           grade_type?: string | null;
           grade_value?: number | null;
+          max_score?: number;
+          weight?: number;
           id?: string;
           subject?: string;
           user_id?: string;

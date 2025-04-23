@@ -1,55 +1,58 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { db, type Course, type Grade } from "@/lib/db"
-import { GradeComparisonFilters } from "@/components/grade-comparison/filters"
-import { GradeComparisonBarChart } from "@/components/grade-comparison/bar-chart"
-import { GradeComparisonLineChart } from "@/components/grade-comparison/line-chart"
-import { GradeComparisonPieChart } from "@/components/grade-comparison/pie-chart"
-import { CourseDetails } from "@/components/grade-comparison/course-details"
-import { ComparativeMetrics } from "@/components/grade-comparison/comparative-metrics"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Skeleton } from "@/components/ui/skeleton"
+import { useState } from "react";
+import { GradeComparisonFilters } from "@/components/grade-comparison/filters";
+import { GradeComparisonBarChart } from "@/components/grade-comparison/bar-chart";
+import { GradeComparisonLineChart } from "@/components/grade-comparison/line-chart";
+import { GradeComparisonPieChart } from "@/components/grade-comparison/pie-chart";
+import { CourseDetails } from "@/components/grade-comparison/course-details";
+import { ComparativeMetrics } from "@/components/grade-comparison/comparative-metrics";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useCourses } from "@/lib/api/grades";
+import { useToast } from "@/hooks/use-toast";
 
 export default function GradeComparisonPage() {
-  const [courses, setCourses] = useState<Course[]>([])
-  const [grades, setGrades] = useState<Grade[]>([])
-  const [selectedCourses, setSelectedCourses] = useState<string[]>([])
-  const [timeframe, setTimeframe] = useState<string>("semester")
-  const [chartType, setChartType] = useState<string>("bar")
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("visualization")
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [timeframe, setTimeframe] = useState<string>("semester");
+  const [chartType, setChartType] = useState<string>("bar");
+  const [activeTab, setActiveTab] = useState("visualization");
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        const allCourses = await db.courses.toArray()
-        const allGrades = await db.grades.toArray()
+  // Fetch courses using React Query
+  const {
+    data: courses = [],
+    isLoading: coursesLoading,
+    error: coursesError,
+  } = useCourses();
 
-        setCourses(allCourses)
-        setGrades(allGrades)
+  // Handle loading state
+  const isLoading = coursesLoading;
 
-        // Select all courses by default
-        setSelectedCourses(allCourses.map((course) => course.id || "").filter(Boolean))
-      } catch (error) {
-        console.error("Error loading data:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
+  // Handle errors
+  if (coursesError) {
+    toast({
+      title: "Error",
+      description: "Failed to load data. Please try again later.",
+      variant: "destructive",
+    });
+  }
 
-    loadData()
-  }, [])
+  // Set initial selected courses
+  if (courses.length > 0 && selectedCourses.length === 0) {
+    setSelectedCourses(courses.map((course) => course.id));
+  }
 
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex flex-col space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Grade Comparison</h1>
-        <p className="text-muted-foreground">Compare and analyze your academic performance across courses</p>
+        <p className="text-muted-foreground">
+          Compare and analyze your academic performance across courses
+        </p>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-[400px] w-full" />
@@ -77,7 +80,6 @@ export default function GradeComparisonPage() {
               {chartType === "bar" && (
                 <GradeComparisonBarChart
                   courses={courses}
-                  grades={grades}
                   selectedCourses={selectedCourses}
                   timeframe={timeframe}
                 />
@@ -86,25 +88,33 @@ export default function GradeComparisonPage() {
               {chartType === "line" && (
                 <GradeComparisonLineChart
                   courses={courses}
-                  grades={grades}
                   selectedCourses={selectedCourses}
                   timeframe={timeframe}
                 />
               )}
 
               {chartType === "pie" && (
-                <GradeComparisonPieChart courses={courses} grades={grades} selectedCourses={selectedCourses} />
+                <GradeComparisonPieChart
+                  courses={courses}
+                  selectedCourses={selectedCourses}
+                />
               )}
 
-              <ComparativeMetrics courses={courses} grades={grades} selectedCourses={selectedCourses} />
+              <ComparativeMetrics
+                courses={courses}
+                selectedCourses={selectedCourses}
+              />
             </TabsContent>
 
             <TabsContent value="details">
-              <CourseDetails courses={courses} grades={grades} selectedCourses={selectedCourses} />
+              <CourseDetails
+                courses={courses}
+                selectedCourses={selectedCourses}
+              />
             </TabsContent>
           </Tabs>
         </>
       )}
     </div>
-  )
+  );
 }

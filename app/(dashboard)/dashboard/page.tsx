@@ -226,7 +226,7 @@ export default function Dashboard() {
               </CardContent>
               <CardFooter>
                 <Button variant="outline" className="w-full" asChild>
-                  <Link href="/timeline">
+                  <Link href="/schedule">
                     View Full Timeline <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
@@ -340,8 +340,10 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground mt-1">
                 Define your goals to track your progress
               </p>
-              <Button className="mt-4">
-                <Plus className="mr-2 h-4 w-4" /> Add Goals
+              <Button className="mt-4" asChild>
+                <Link href="/goals">
+                  <Plus className="mr-2 h-4 w-4" /> Add Goals
+                </Link>
               </Button>
             </CardContent>
           </Card>
