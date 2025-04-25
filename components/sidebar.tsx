@@ -20,7 +20,7 @@ import {
   PenTool,
   Settings,
   Target,
-  TimerIcon,
+  Timer,
   Users,
 } from "lucide-react";
 
@@ -74,6 +74,11 @@ const routes = [
     href: "/courses",
   },
   {
+    label: "Courses",
+    icon: BookOpen,
+    href: "/courses",
+  },
+  {
     label: "Schedule",
     icon: Calendar,
     href: "/schedule",
@@ -95,7 +100,7 @@ const routes = [
   },
   {
     label: "Pomodoro",
-    icon: TimerIcon,
+    icon: Timer,
     href: "/pomodoro",
   },
   {
@@ -146,7 +151,27 @@ const routes = [
 ];
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
-  const { isOpen, setIsOpen, isMobile } = useSidebar();
+  const [isOpen, setIsOpen] = React.useState(true);
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  // Check if we're on mobile and set initial state
+  React.useEffect(() => {
+    const checkIsMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // On mobile, sidebar should be closed by default
+      if (mobile && isOpen) {
+        setIsOpen(false);
+      }
+    };
+
+    // Check on mount
+    checkIsMobile();
+
+    // Add resize listener
+    window.addEventListener("resize", checkIsMobile);
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, [isOpen]);
 
   return (
     <SidebarContext.Provider value={{ isOpen, setIsOpen, isMobile }}>
@@ -257,7 +282,7 @@ export function Sidebar() {
               {isLoading ? "..." : getInitials(user?.user_metadata?.name)}
             </span>
           </div>
-          {(isOpen || isMobile) && (
+          {isOpen && (
             <div className="flex flex-col">
               <span className="text-sm font-medium">
                 {isLoading
