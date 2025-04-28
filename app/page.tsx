@@ -14,8 +14,6 @@ function LandingPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false); // Controls form visibility
-  const [isSignUp, setIsSignUp] = useState(false); // Toggles between login and signup
 
   useEffect(() => {
     const supabase = createClient();
@@ -54,74 +52,18 @@ function LandingPageContent() {
         goals, and application tracking.
       </p>
 
-      {/* Show buttons to trigger form display */}
-      {!showForm ? (
-        <div className="flex flex-col sm:flex-row gap-4 mt-8">
-          <Button size="lg" onClick={() => { setShowForm(true); setIsSignUp(false); }}>
-            Login
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            onClick={() => { setShowForm(true); setIsSignUp(true); }}
-          >
-            Sign Up
-          </Button>
-        </div>
-      ) : (
-        // Display form based on sign-up or login
-        <div className="flex flex-col gap-4">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="border p-2 rounded w-full max-w-sm"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="border p-2 rounded w-full max-w-sm"
-          />
-          <div className="flex flex-col sm:flex-row gap-4 mt-8">
-            <Button size="lg" onClick={() => router.push("/auth/login")}>
-              Login
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={async () => {
-                setLoading(true);
-                const supabase = createClient();
-                const { data, error } = isSignUp
-                  ? await supabase.auth.signUp({ email, password })
-                  : await supabase.auth.signInWithPassword({ email, password });
-
-                setLoading(false);
-
-                if (error) {
-                  console.error(error);
-                  toast({
-                    title: "Signup/Login failed",
-                    description: error.message,
-                    variant: "destructive",
-                  });
-                } else {
-                  toast({
-                    title: isSignUp ? "Signup successful!" : "Login successful!",
-                    description: "Redirecting to dashboard...",
-                  });
-                  router.push("/dashboard");
-                }
-              }}
-            >
-              {loading ? <span className="loader"></span> : isSignUp ? "Sign Up" : "Login"}
-            </Button>
-          </div>
-        </div>
-      )}
+      <div className="flex flex-col sm:flex-row gap-4 mt-8">
+        <Button size="lg" onClick={() => router.push("/auth/login")}>
+          Login
+        </Button>
+        <Button
+          size="lg"
+          variant="outline"
+          onClick={() => router.push("/auth/signup")}
+        >
+          Sign Up
+        </Button>
+      </div>
 
       <div className="absolute bottom-4 left-4 text-sm text-muted-foreground">
         v0.1
