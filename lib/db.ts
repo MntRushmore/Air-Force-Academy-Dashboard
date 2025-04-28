@@ -149,6 +149,16 @@ export interface Goal {
 }
 
 // New interfaces for course management
+
+export interface Assignment {
+  id?: string;
+  courseId: string;
+  assignmentName: string;
+  maxScore: number;
+  weight: number;
+  dueDate: string;
+  createdAt?: Date;
+}
 export interface Course {
   id?: string
   code: string
@@ -197,6 +207,7 @@ class USAFADashboardDB extends Dexie {
   courses!: Table<Course>
   grades!: Table<Grade>
   settings!: Table<Settings>
+  assignments!: Table<Assignment>
 
   constructor() {
     super("USAFADashboardDB")
@@ -214,6 +225,7 @@ class USAFADashboardDB extends Dexie {
       courses: "++id, code, name, semester, year, category, isAP, createdAt",
       grades: "++id, courseId, type, date, createdAt",
       settings: "++id, key, createdAt",
+      assignments: "++id, courseId, assignmentName, createdAt",
     })
   }
 }
