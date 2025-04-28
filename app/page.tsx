@@ -118,6 +118,9 @@ function LandingPageContent() {
           )}
         </Button>
       </div>
+      <div className="absolute bottom-4 left-4 text-sm text-muted-foreground">
+        v0.1
+      </div>
     </div>
   );
 }
