@@ -1,46 +1,36 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import React, { useEffect, Suspense, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/utils/supabase/client";
 
 function LandingPageContent() {
-  const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // initially loading
 
   useEffect(() => {
     const supabase = createClient();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN") {
-        toast({
-          title: "Success",
-          description: "You have been successfully signed in.",
-        });
-        router.push("/dashboard");
-      }
-    });
-
     const handleInitialRedirect = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         router.push("/dashboard");
+      } else {
+        setLoading(false); // not logged in, show landing page
       }
     };
 
     handleInitialRedirect();
+  }, [router]);
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [router, toast]);
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen space-y-4 p-4">
