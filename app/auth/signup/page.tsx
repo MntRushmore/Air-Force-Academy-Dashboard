@@ -48,7 +48,7 @@ function SignUpPageContent() {
     },
     onSuccess: (error) => {
       if (!error) {
-        router.push("/auth/verification");
+        router.push("/dashboard");
       }
     },
   });

@@ -40,24 +40,6 @@ function LoginPageContent() {
     },
   });
 
-  // Handle verification code
-  useEffect(() => {
-    const handleVerification = async () => {
-      const code = searchParams.get("code");
-      if (code) {
-        const supabase = createClient();
-        const { error, data } = await supabase.auth.getUser();
-        console.log({ error, code, data });
-        if (!error) {
-          router.push("/dashboard");
-        } else {
-          router.push("/auth/login?error=Verification failed");
-        }
-      }
-    };
-
-    handleVerification();
-  }, [searchParams, router]);
 
   const onSubmit = (formData: FormData) => {
     loginMutation.mutate(formData);
