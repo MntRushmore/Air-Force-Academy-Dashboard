@@ -24,6 +24,7 @@ import { useMutation } from "@tanstack/react-query";
 import { signUp } from "../actions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
+import { Suspense } from "react";
 
 const COLLEGES = [
   "Air Force Academy",
@@ -32,7 +33,7 @@ const COLLEGES = [
   //   "Coast Guard Academy",
 ] as const;
 
-export default function SignUpPage() {
+function SignUpPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
@@ -164,5 +165,13 @@ export default function SignUpPage() {
         </form>
       </Card>
     </div>
+  );
+}
+
+export default function SignUpPageWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignUpPageContent />
+    </Suspense>
   );
 }

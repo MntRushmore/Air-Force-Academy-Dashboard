@@ -758,3 +758,20 @@ export const Constants = {
     Enums: {},
   },
 } as const;
+
+// Utility function to map database course row to frontend format
+export function mapDbCourseToFrontend(course: Database["public"]["Tables"]["courses"]["Row"]) {
+  return {
+    id: course.id,
+    code: course.code,
+    name: course.name,
+    year: course.year,
+    semester: course.semester,
+    credits: course.credits,
+    grade: course.grade,
+    is_ap: course.is_ap,
+    createdAt: course.created_at,
+    updatedAt: course.updated_at,
+    userId: course.user_id,
+  };
+}
