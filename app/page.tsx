@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useSearchParams, useRouter } from "next/navigation";
-import React, { useEffect, Suspense } from "react";
+import React, { useEffect, Suspense, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/utils/supabase/client";
 
@@ -10,6 +10,10 @@ function LandingPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false); // add loading state for signup
 
   useEffect(() => {
     const supabase = createClient();
@@ -61,6 +65,22 @@ function LandingPageContent() {
         goals, and application tracking.
       </p>
 
+      {/* Signup form fields */}
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="border p-2 rounded w-full max-w-sm"
+      />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        className="border p-2 rounded w-full max-w-sm"
+      />
+
       <div className="flex flex-col sm:flex-row gap-4 mt-8">
         <Button size="lg" onClick={() => router.push("/auth/login")}>
           Login
@@ -68,9 +88,34 @@ function LandingPageContent() {
         <Button
           size="lg"
           variant="outline"
-          onClick={() => router.push("/auth/signup")}
+          onClick={async () => {
+            setLoading(true); // Start loading spinner
+            const supabase = createClient();
+            const { data, error } = await supabase.auth.signUp({ email, password });
+
+            setLoading(false); // Stop loading spinner
+
+            if (error) {
+              console.error(error);
+              toast({
+                title: "Signup failed",
+                description: error.message,
+                variant: "destructive",
+              });
+            } else {
+              toast({
+                title: "Signup successful!",
+                description: "Redirecting to dashboard...",
+              });
+              router.push("/dashboard");
+            }
+          }}
         >
-          Sign Up
+          {loading ? (
+            <span className="loader"></span>
+          ) : (
+            "Sign Up"
+          )}
         </Button>
       </div>
     </div>
