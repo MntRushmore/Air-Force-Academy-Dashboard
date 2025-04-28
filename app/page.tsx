@@ -13,18 +13,14 @@ function LandingPageContent() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false); // add loading state for signup
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false); // Controls form visibility
+  const [isSignUp, setIsSignUp] = useState(false); // Toggles between login and signup
 
   useEffect(() => {
     const supabase = createClient();
 
-    // Handle auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth event:", event);
-      console.log("Session:", session);
-
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN") {
         toast({
           title: "Success",
@@ -34,14 +30,8 @@ function LandingPageContent() {
       }
     });
 
-    // Handle initial auth state
     const handleInitialRedirect = async () => {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
-      console.log({ session, error });
-
+      const { data: { session }, error } = await supabase.auth.getSession();
       if (session) {
         router.push("/dashboard");
       }
@@ -49,7 +39,6 @@ function LandingPageContent() {
 
     handleInitialRedirect();
 
-    // Cleanup subscription
     return () => {
       subscription.unsubscribe();
     };
@@ -65,59 +54,75 @@ function LandingPageContent() {
         goals, and application tracking.
       </p>
 
-      {/* Signup form fields */}
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="border p-2 rounded w-full max-w-sm"
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="border p-2 rounded w-full max-w-sm"
-      />
+      {/* Show buttons to trigger form display */}
+      {!showForm ? (
+        <div className="flex flex-col sm:flex-row gap-4 mt-8">
+          <Button size="lg" onClick={() => { setShowForm(true); setIsSignUp(false); }}>
+            Login
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => { setShowForm(true); setIsSignUp(true); }}
+          >
+            Sign Up
+          </Button>
+        </div>
+      ) : (
+        // Display form based on sign-up or login
+        <div className="flex flex-col gap-4">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="border p-2 rounded w-full max-w-sm"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="border p-2 rounded w-full max-w-sm"
+          />
+          <div className="flex flex-col sm:flex-row gap-4 mt-8">
+            <Button size="lg" onClick={() => router.push("/auth/login")}>
+              Login
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={async () => {
+                setLoading(true);
+                const supabase = createClient();
+                const { data, error } = isSignUp
+                  ? await supabase.auth.signUp({ email, password })
+                  : await supabase.auth.signInWithPassword({ email, password });
 
-      <div className="flex flex-col sm:flex-row gap-4 mt-8">
-        <Button size="lg" onClick={() => router.push("/auth/login")}>
-          Login
-        </Button>
-        <Button
-          size="lg"
-          variant="outline"
-          onClick={async () => {
-            setLoading(true); // Start loading spinner
-            const supabase = createClient();
-            const { data, error } = await supabase.auth.signUp({ email, password });
+                setLoading(false);
 
-            setLoading(false); // Stop loading spinner
+                if (error) {
+                  console.error(error);
+                  toast({
+                    title: "Signup/Login failed",
+                    description: error.message,
+                    variant: "destructive",
+                  });
+                } else {
+                  toast({
+                    title: isSignUp ? "Signup successful!" : "Login successful!",
+                    description: "Redirecting to dashboard...",
+                  });
+                  router.push("/dashboard");
+                }
+              }}
+            >
+              {loading ? <span className="loader"></span> : isSignUp ? "Sign Up" : "Login"}
+            </Button>
+          </div>
+        </div>
+      )}
 
-            if (error) {
-              console.error(error);
-              toast({
-                title: "Signup failed",
-                description: error.message,
-                variant: "destructive",
-              });
-            } else {
-              toast({
-                title: "Signup successful!",
-                description: "Redirecting to dashboard...",
-              });
-              router.push("/dashboard");
-            }
-          }}
-        >
-          {loading ? (
-            <span className="loader"></span>
-          ) : (
-            "Sign Up"
-          )}
-        </Button>
-      </div>
       <div className="absolute bottom-4 left-4 text-sm text-muted-foreground">
         v0.1
       </div>
