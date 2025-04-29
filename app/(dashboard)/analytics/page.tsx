@@ -124,14 +124,6 @@ export default function AnalyticsPage() {
             <TabsTrigger value="year">Year</TabsTrigger>
           </TabsList>
         </Tabs>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            Export
-          </Button>
-          <Button variant="outline" size="sm">
-            Print
-          </Button>
-        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -222,7 +214,13 @@ export default function AnalyticsPage() {
             <CardDescription>Hours spent on different subjects</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <PieChart data={studyChartData} loading={loadingStudy} />
+            {studyChartData.length > 0 ? (
+              <PieChart data={studyChartData} loading={loadingStudy} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No data available
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card className="col-span-1">
@@ -231,7 +229,13 @@ export default function AnalyticsPage() {
             <CardDescription>Performance over time</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <LineChart data={gradeChartData} loading={loadingGrades} />
+            {gradeChartData.length > 0 ? (
+              <LineChart data={gradeChartData} loading={loadingGrades} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No data available
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -244,19 +248,25 @@ export default function AnalyticsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="h-[300px]">
-          <MultiLineChart
-            data={fitnessChartData}
-            loading={loadingFitnessProgress}
-            lines={[
-              "pushups",
-              "situps",
-              "pullups",
-              "crunches",
-              "basketball",
-              "shuttle run",
-              "mile run",
-            ]}
-          />
+          {fitnessChartData.length > 0 ? (
+            <MultiLineChart
+              data={fitnessChartData}
+              loading={loadingFitnessProgress}
+              lines={[
+                "pushups",
+                "situps",
+                "pullups",
+                "crunches",
+                "basketball",
+                "shuttle run",
+                "mile run",
+              ]}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              No data available
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -269,7 +279,13 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="h-[200px]">
-            <LineChart data={taskChartData} loading={loadingTasks} />
+            {taskChartData.length > 0 ? (
+              <LineChart data={taskChartData} loading={loadingTasks} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No data available
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -278,11 +294,17 @@ export default function AnalyticsPage() {
             <CardDescription>Focus time analysis</CardDescription>
           </CardHeader>
           <CardContent className="h-[200px]">
-            <StackedBarChart
-              data={pomodoroChartData}
-              loading={loadingPomodoro}
-              bars={["sessions", "minutes"]}
-            />
+            {pomodoroChartData.length > 0 ? (
+              <StackedBarChart
+                data={pomodoroChartData}
+                loading={loadingPomodoro}
+                bars={["sessions", "minutes"]}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No data available
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

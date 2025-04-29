@@ -46,7 +46,9 @@ export default function AssignmentList({ courseId }: { courseId: string }) {
               </div>
               <div className="mt-2">
                 <button
-                  onClick={() => setShowGradeFormId(assignment.id === showGradeFormId ? null : assignment.id)}
+                  onClick={() => setShowGradeFormId(
+                    assignment.id ? (assignment.id === showGradeFormId ? null : assignment.id) : null
+                  )}
                   className="text-blue-500 underline"
                 >
                   {assignment.id === showGradeFormId ? "Cancel" : "➕ Add Grade"}

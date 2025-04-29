@@ -1,3 +1,8 @@
+import { Course } from "@/types/Course";
+import { Assignment } from "@/types/Assignment";
+import { Grade } from "@/types/Grade";
+import { Exercise } from "@/types/Exercise";
+import { Goal } from "@/types/Goal";
 "use client";
 
 import { CardFooter } from "@/components/ui/card";
@@ -43,18 +48,24 @@ export default function Dashboard() {
   const assignmentGrades = useLiveQuery(() => db.grades.toArray(), []) || [];
 
   // Weighted GPA calculation based on assignments and grades
-  const calculateGPA = (courses, assignments, grades) => {
+  const calculateGPA = (
+    courses: Course[],
+    assignments: Assignment[],
+    grades: Grade[]
+  ) => {
     let totalWeightedScores = 0;
     let totalWeights = 0;
 
-    courses.forEach((course) => {
-      const courseAssignments = assignments.filter((a) => a.courseId === course.id);
+    courses.forEach((course: Course) => {
+      const courseAssignments = assignments.filter(
+        (a: Assignment) => a.course_id === course.id
+      );
 
-      courseAssignments.forEach((assignment) => {
-        const grade = grades.find((g) => g.assignmentId === assignment.id);
+      courseAssignments.forEach((assignment: Assignment) => {
+        const grade = grades.find((g: Grade) => g.assignment_id === assignment.id);
 
         if (grade && assignment.maxScore > 0) {
-          const percentScore = grade.scoreReceived / assignment.maxScore;
+          const percentScore = grade.score_received / assignment.maxScore;
           totalWeightedScores += percentScore * assignment.weight;
           totalWeights += assignment.weight;
         }

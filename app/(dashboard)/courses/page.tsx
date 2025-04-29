@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Plus, Pencil, Trash2, Search, Filter, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client-utils"; // Fixed import path
@@ -71,12 +72,12 @@ export default function CoursesPage() {
   const { toast } = useToast();
   const supabase = createClient();
 
-  const years = Array.from(new Set(courses.map((course) => course.year))).sort(
+  const years = Array.from(new Set(courses.map((course: Course) => course.year))).sort(
     (a, b) => b - a
   );
 
   const semesters = Array.from(
-    new Set(courses.map((course) => course.semester))
+    new Set(courses.map((course: Course) => course.semester))
   );
 
   const { user } = useAuth();
@@ -354,7 +355,7 @@ export default function CoursesPage() {
             </Card>
           ))
         ) : filteredCourses.length > 0 ? (
-          filteredCourses.map((course) => (
+          filteredCourses.map((course: Course) => (
             <Card key={course.id} className="overflow-hidden">
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
@@ -391,23 +392,30 @@ export default function CoursesPage() {
                 </div>
               </CardContent>
               <CardFooter className="flex justify-between">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEditCourse(course)}
-                >
-                  <Pencil className="mr-2 h-3.5 w-3.5" />
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => handleDeleteCourse(course)}
-                >
-                  <Trash2 className="mr-2 h-3.5 w-3.5" />
-                  Delete
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEditCourse(course)}
+                  >
+                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleDeleteCourse(course)}
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    Delete
+                  </Button>
+                  <Link href={`/courses/${course.id}/assignments`}>
+                    <Button variant="outline" size="sm">
+                      Assignments
+                    </Button>
+                  </Link>
+                </div>
               </CardFooter>
             </Card>
           ))

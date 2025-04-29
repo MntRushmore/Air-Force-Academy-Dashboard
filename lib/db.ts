@@ -1,4 +1,4 @@
-import Dexie, { type Table } from "dexie"
+import Dexie, { type Table } from 'dexie'
 
 // Improved openDB function with proper compatibility methods
 export const openDB = async () => {
@@ -71,7 +71,7 @@ export interface Task {
   title: string
   description: string
   dueDate: string
-  priority: "high" | "medium" | "low"
+  priority: 'high' | 'medium' | 'low'
   completed: boolean
   subject: string
   createdAt?: Date
@@ -83,7 +83,7 @@ export interface Event {
   date: string
   startTime: string
   endTime: string
-  type: "study" | "class" | "exam" | "other"
+  type: 'study' | 'class' | 'exam' | 'other'
   createdAt?: Date
 }
 
@@ -125,7 +125,7 @@ export interface Question {
   answer: string
   category: string
   date: string
-  status: "answered" | "pending"
+  status: 'answered' | 'pending'
   createdAt?: Date
 }
 
@@ -167,7 +167,7 @@ export interface Course {
   credits: number
   semester: string
   year: number
-  category: string // e.g., "STEM", "Humanities", "Physical Education"
+  category: string // e.g., 'STEM', 'Humanities', 'Physical Education'
   isAP: boolean
   notes: string
   createdAt?: Date
@@ -177,7 +177,7 @@ export interface Grade {
   id?: string
   courseId: string
   title: string
-  type: "exam" | "quiz" | "homework" | "project" | "paper" | "participation" | "other"
+  type: 'exam' | 'quiz' | 'homework' | 'project' | 'paper' | 'participation' | 'other'
   score: number
   maxScore: number
   weight: number // percentage weight in final grade
@@ -244,7 +244,7 @@ export async function addItem<T>(table: Table<T>, item: T): Promise<string | num
 }
 
 export async function updateItem<T>(table: Table<T>, id: string | number, changes: Partial<T>): Promise<void> {
-  await table.update(id, changes)
+  await table.update(id, { ...changes })
 }
 
 export async function deleteItem<T>(table: Table<T>, id: string | number): Promise<void> {
@@ -265,18 +265,18 @@ export async function initializeEmptyDB() {
 export async function importGradesFromCSV(courseId: string, csvContent: string): Promise<void> {
   try {
     // Parse CSV content
-    const lines = csvContent.split("\n")
-    const headers = lines[0].split(",")
+    const lines = csvContent.split('\n')
+    const headers = lines[0].split(',')
 
     // Find indices for required columns
-    const titleIndex = headers.findIndex((h) => h.toLowerCase().includes("title") || h.toLowerCase().includes("name"))
-    const typeIndex = headers.findIndex((h) => h.toLowerCase().includes("type") || h.toLowerCase().includes("category"))
-    const scoreIndex = headers.findIndex((h) => h.toLowerCase().includes("score") || h.toLowerCase().includes("points"))
-    const maxScoreIndex = headers.findIndex((h) => h.toLowerCase().includes("max") || h.toLowerCase().includes("total"))
+    const titleIndex = headers.findIndex((h) => h.toLowerCase().includes('title') || h.toLowerCase().includes('name'))
+    const typeIndex = headers.findIndex((h) => h.toLowerCase().includes('type') || h.toLowerCase().includes('category'))
+    const scoreIndex = headers.findIndex((h) => h.toLowerCase().includes('score') || h.toLowerCase().includes('points'))
+    const maxScoreIndex = headers.findIndex((h) => h.toLowerCase().includes('max') || h.toLowerCase().includes('total'))
     const weightIndex = headers.findIndex(
-      (h) => h.toLowerCase().includes("weight") || h.toLowerCase().includes("percent"),
+      (h) => h.toLowerCase().includes('weight') || h.toLowerCase().includes('percent'),
     )
-    const dateIndex = headers.findIndex((h) => h.toLowerCase().includes("date"))
+    const dateIndex = headers.findIndex((h) => h.toLowerCase().includes('date'))
 
     // Validate required columns
     if (titleIndex === -1 || scoreIndex === -1) {
@@ -288,17 +288,18 @@ export async function importGradesFromCSV(courseId: string, csvContent: string):
     for (let i = 1; i < lines.length; i++) {
       if (!lines[i].trim()) continue
 
-      const values = lines[i].split(",")
+      const values = lines[i].split(',')
 
       const grade: Grade = {
         courseId,
         title: values[titleIndex].trim(),
-        type: typeIndex !== -1 ? mapGradeType(values[typeIndex].trim()) : "other",
+        type: typeIndex !== -1 ? mapGradeType(values[typeIndex].trim()) : 'other',
         score: Number.parseFloat(values[scoreIndex].trim()),
         maxScore: maxScoreIndex !== -1 ? Number.parseFloat(values[maxScoreIndex].trim()) : 100,
         weight: weightIndex !== -1 ? Number.parseFloat(values[weightIndex].trim()) : 1,
-        date: dateIndex !== -1 ? values[dateIndex].trim() : new Date().toISOString().split("T")[0],
-        notes: "",
+        date: dateIndex !== -1 ? values[dateIndex].trim() : new Date().toISOString().split('T')[0],
+        notes: '',
+        createdAt: new Date(),
       }
 
       grades.push(grade)
@@ -309,21 +310,21 @@ export async function importGradesFromCSV(courseId: string, csvContent: string):
 
     return
   } catch (error) {
-    console.error("Error importing grades:", error)
+    console.error('Error importing grades:', error)
     throw error
   }
 }
 
 // Helper function to map grade types
-function mapGradeType(type: string): Grade["type"] {
+function mapGradeType(type: string): Grade['type'] {
   type = type.toLowerCase()
-  if (type.includes("exam") || type.includes("test")) return "exam"
-  if (type.includes("quiz")) return "quiz"
-  if (type.includes("homework") || type.includes("hw")) return "homework"
-  if (type.includes("project")) return "project"
-  if (type.includes("paper") || type.includes("essay")) return "paper"
-  if (type.includes("participation")) return "participation"
-  return "other"
+  if (type.includes('exam') || type.includes('test')) return 'exam'
+  if (type.includes('quiz')) return 'quiz'
+  if (type.includes('homework') || type.includes('hw')) return 'homework'
+  if (type.includes('project')) return 'project'
+  if (type.includes('paper') || type.includes('essay')) return 'paper'
+  if (type.includes('participation')) return 'participation'
+  return 'other'
 }
 
 // Calculate GPA

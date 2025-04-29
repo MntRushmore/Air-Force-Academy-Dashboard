@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { db } from "@/lib/db";
+import { Grade } from "@/types/Grade";
 
 export default function AddGrade({ assignmentId }: { assignmentId: string }) {
   const [scoreReceived, setScoreReceived] = useState<number | "">("");
@@ -11,11 +12,12 @@ export default function AddGrade({ assignmentId }: { assignmentId: string }) {
       alert("Please enter a score!");
       return;
     }
-    await db.grades.add({
-      assignmentId,
-      scoreReceived: Number(scoreReceived),
-      createdAt: new Date(),
-    });
+    const newGrade: Grade = {
+      assignment_id: assignmentId,
+      score_received: Number(scoreReceived),
+      created_at: new Date().toISOString(),
+    };
+    await db.grades.add(newGrade);
     setScoreReceived("");
     alert("Grade added!");
   };
