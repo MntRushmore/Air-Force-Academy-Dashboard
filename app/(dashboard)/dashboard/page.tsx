@@ -42,10 +42,10 @@ import { calculateApplicationProgress } from "@/lib/application-utils";
 import { useEffect, useState } from "react";
 
 export default function Dashboard() {
-  const courses = useLiveQuery(() => db.courses.toArray(), []) || [];
-  const grades = useLiveQuery(() => db.grades.toArray(), []) || [];
-  const assignments = useLiveQuery(() => db.assignments.toArray(), []) || [];
-  const assignmentGrades = useLiveQuery(() => db.grades.toArray(), []) || [];
+  const courses = useLiveQuery<Course[]>(() => db.courses.toArray(), []) || [];
+  const grades = useLiveQuery<Grade[]>(() => db.grades.toArray(), []) || [];
+  const assignments = useLiveQuery<Assignment[]>(() => db.assignments.toArray(), []) || [];
+  const assignmentGrades = useLiveQuery<Grade[]>(() => db.grades.toArray(), []) || [];
 
   // Weighted GPA calculation based on assignments and grades
   const calculateGPA = (

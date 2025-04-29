@@ -92,7 +92,7 @@ export default function CoursesPage() {
       if (!user) return;
 
       const { data, error } = await supabase
-        .from("courses")
+        .from<Course, Course>("courses")
         .select("*")
         .eq("user_id", user?.id)
         .order("year", { ascending: false })
@@ -118,7 +118,7 @@ export default function CoursesPage() {
     try {
       if (!user) return;
       const { data, error } = await supabase
-        .from("courses")
+        .from<Course, Course>("courses")
         .insert([{ ...newCourse, user_id: user.id }])
         .select();
 

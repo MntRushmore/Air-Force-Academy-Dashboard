@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client-utils';
 import { useToast } from '@/hooks/use-toast';
-import { AssignmentCard } from '@/components/assignments/AssignmentCard';
-import { AssignmentDialog } from '@/components/assignments/AssignmentDialog';
+import { AssignmentCard } from '../../../../components/assignments/AssignmentCard';
+import { AssignmentDialog } from '../../../../components/assignments/AssignmentDialog';
 
 interface Assignment {
   id: string;
