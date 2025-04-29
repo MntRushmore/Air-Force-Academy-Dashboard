@@ -12,11 +12,11 @@ import { Progress } from "@/components/ui/progress"
 
 interface PomodoroSession {
   id?: string
-  user_id: string
+  user_id: string | null
   duration: number
   task: string
   completed_at: string
-  created_at?: string
+  created_at: string | null
 }
 
 export function PomodoroTimer() {
@@ -133,6 +133,7 @@ export function PomodoroTimer() {
         duration: durations.focus - (isPaused ? secondsLeft : 0),
         task: task || "Focused work",
         completed_at: new Date().toISOString(),
+        created_at: null
       }
 
       const { error } = await supabase.from("pomodoro_sessions").insert([sessionData])
