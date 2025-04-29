@@ -85,11 +85,6 @@ export function AppSidebar() {
       href: "/grade-comparison",
     },
     {
-      label: "Grade Prediction",
-      icon: GraduationCap,
-      href: "/grade-prediction",
-    },
-    {
       label: "Fitness",
       icon: Dumbbell,
       href: "/fitness",

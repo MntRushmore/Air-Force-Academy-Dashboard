@@ -70,7 +70,6 @@ const routes = [
   { label: "Grades", icon: FileText, href: "/grades" },
   { label: "Report Card", icon: ClipboardList, href: "/report-card" },
   { label: "Grade Comparison", icon: LineChart, href: "/grade-comparison" },
-  { label: "Grade Prediction", icon: GraduationCap, href: "/grade-prediction" },
   { label: "Fitness", icon: Dumbbell, href: "/fitness" },
   { label: "Analytics", icon: BarChart3, href: "/analytics" },
   { label: "Mentorship", icon: Users, href: "/mentorship" },
