@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
+import AddGrade from "@/components/AddGrade";
 
 export default function AssignmentList({ courseId }: { courseId: string }) {
   const assignments = useLiveQuery(() =>
@@ -10,6 +12,8 @@ export default function AssignmentList({ courseId }: { courseId: string }) {
       .equals(courseId)
       .toArray()
   , [courseId]) || [];
+
+  const [showGradeFormId, setShowGradeFormId] = useState<string | null>(null);
 
   // Sort assignments by due date, if present
   const sortedAssignments = assignments.sort((a, b) => {
@@ -39,6 +43,19 @@ export default function AssignmentList({ courseId }: { courseId: string }) {
                       day: "numeric",
                     })
                   : "No date set"}
+              </div>
+              <div className="mt-2">
+                <button
+                  onClick={() => setShowGradeFormId(assignment.id === showGradeFormId ? null : assignment.id)}
+                  className="text-blue-500 underline"
+                >
+                  {assignment.id === showGradeFormId ? "Cancel" : "➕ Add Grade"}
+                </button>
+                {assignment.id === showGradeFormId && (
+                  <div className="mt-2">
+                    <AddGrade assignmentId={assignment.id} />
+                  </div>
+                )}
               </div>
             </li>
           ))}

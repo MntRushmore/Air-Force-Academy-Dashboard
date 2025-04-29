@@ -29,7 +29,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db } from "@/lib/db";
 import { useLiveQuery } from "dexie-react-hooks";
-import { calculateGPA } from "@/lib/grade-analysis";
+
 
 // Add imports for fitness and application utilities
 import { calculateCFAScore } from "@/lib/fitness-utils";
@@ -39,9 +39,35 @@ import { useEffect, useState } from "react";
 export default function Dashboard() {
   const courses = useLiveQuery(() => db.courses.toArray(), []) || [];
   const grades = useLiveQuery(() => db.grades.toArray(), []) || [];
+  const assignments = useLiveQuery(() => db.assignments.toArray(), []) || [];
+  const assignmentGrades = useLiveQuery(() => db.grades.toArray(), []) || [];
 
-  // Calculate GPA using the unified function
-  const currentGPA = calculateGPA(courses, grades);
+  // Weighted GPA calculation based on assignments and grades
+  const calculateGPA = (courses, assignments, grades) => {
+    let totalWeightedScores = 0;
+    let totalWeights = 0;
+
+    courses.forEach((course) => {
+      const courseAssignments = assignments.filter((a) => a.courseId === course.id);
+
+      courseAssignments.forEach((assignment) => {
+        const grade = grades.find((g) => g.assignmentId === assignment.id);
+
+        if (grade && assignment.maxScore > 0) {
+          const percentScore = grade.scoreReceived / assignment.maxScore;
+          totalWeightedScores += percentScore * assignment.weight;
+          totalWeights += assignment.weight;
+        }
+      });
+    });
+
+    if (totalWeights === 0) return 0;
+    const finalScore = (totalWeightedScores / totalWeights) * 4.0;
+    return Math.min(finalScore, 4.0);
+  };
+
+  // Calculate GPA using assignments and assignment grades
+  const currentGPA = calculateGPA(courses, assignments, assignmentGrades);
 
   // Calculate fitness score (placeholder for now)
   const exercises = useLiveQuery(() => db.exercises.toArray(), []) || [];
@@ -91,9 +117,6 @@ export default function Dashboard() {
     getApplicationProgress();
   }, [goals, exercises, gender, currentGPA]);
 
-  // Calculate XP level (placeholder for now)
-  const xpLevel = 1;
-  const xpProgress = 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -106,7 +129,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="bg-gradient-to-br from-[#0033a0] to-[#003db8] text-white shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Current GPA</CardTitle>
@@ -121,6 +144,15 @@ export default function Dashboard() {
                   : "Add courses to calculate"}
               </span>
             </div>
+            <div className="mt-4">
+              <Progress
+                value={(currentGPA / 4.0) * 100}
+                className="h-2 w-full bg-white/20"
+              />
+              <div className="mt-1 text-xs text-white text-center">
+                {(currentGPA / 4.0 * 100).toFixed(0)}% toward 4.0 GPA
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-[#7d8ca3] to-[#a1afc2] text-white shadow-md hover:shadow-lg transition-shadow">
@@ -133,17 +165,14 @@ export default function Dashboard() {
               <TrendingUp className="mr-1 h-4 w-4" />
               <span>Track your CFA progress</span>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-[#0033a0] to-[#003db8] text-white shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">XP Level</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">Level {xpLevel}</div>
-            <div className="mt-2 flex items-center text-sm">
-              <Progress value={xpProgress} className="h-2 w-full bg-white/20" />
-              <span className="ml-2 text-xs">{xpProgress}%</span>
+            <div className="mt-4">
+              <Progress
+                value={(fitnessScore / 100) * 100}
+                className="h-2 w-full bg-white/20"
+              />
+              <div className="mt-1 text-xs text-white text-center">
+                {fitnessScore}% complete
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -158,6 +187,15 @@ export default function Dashboard() {
             <div className="mt-2 flex items-center text-sm">
               <Flame className="mr-1 h-4 w-4" />
               <span>Get started!</span>
+            </div>
+            <div className="mt-4">
+              <Progress
+                value={applicationProgress}
+                className="h-2 w-full bg-white/20"
+              />
+              <div className="mt-1 text-xs text-white text-center">
+                {applicationProgress}% complete
+              </div>
             </div>
           </CardContent>
         </Card>
