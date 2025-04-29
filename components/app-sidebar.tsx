@@ -134,7 +134,6 @@ export function AppSidebar() {
           {routes.map((route) => (
             <SidebarMenuItem key={route.href}>
               <SidebarMenuButton
-                asChild
                 isActive={pathname === route.href}
                 tooltip={route.label}
               >
@@ -157,4 +156,15 @@ export function AppSidebar() {
       </SidebarFooter>
     </Sidebar>
   );
+}
+export {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarTrigger,
+  useSidebar,
 }
