@@ -51,7 +51,7 @@ export default function AssignmentsPage() {
     }
   }
 
-  async function handleAddAssignment(title: string, dueDate: string) {
+  async function handleAddAssignment(title: string, dueDate: string, courseId: string) {
     try {
       const { error } = await supabase.from('assignments').insert({
         course_id: courseId,
@@ -144,7 +144,7 @@ export default function AssignmentsPage() {
           <p className="text-muted-foreground">Assignments for this course</p>
         </div>
         {/* Add Assignment Dialog */}
-        <AssignmentDialog onAddAssignment={handleAddAssignment} />
+        <AssignmentDialog onAddAssignment={handleAddAssignment} courseId={courseId} />
         {/* Edit Assignment Dialog */}
         {editingAssignment && (
           <AssignmentDialog
@@ -156,6 +156,7 @@ export default function AssignmentsPage() {
               setEditDialogOpen(open);
               if (!open) setEditingAssignment(null);
             }}
+            courseId={courseId}
           />
         )}
       </div>

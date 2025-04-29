@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -10,14 +8,15 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 
 interface AssignmentDialogProps {
-  onAddAssignment: (title: string, dueDate: string) => Promise<void>;
+  onAddAssignment: (title: string, dueDate: string, courseId: string) => Promise<void>;
+  courseId: string;
   initialTitle?: string;
   initialDueDate?: string;
   open?: boolean;
   setOpen?: (open: boolean) => void;
 }
 
-export function AssignmentDialog({ onAddAssignment, initialTitle = '', initialDueDate = '', open, setOpen }: AssignmentDialogProps) {
+export function AssignmentDialog({ onAddAssignment, courseId, initialTitle = '', initialDueDate = '', open, setOpen }: AssignmentDialogProps) {
   const [newTitle, setNewTitle] = useState(initialTitle);
   const [newDueDate, setNewDueDate] = useState(initialDueDate);
 
@@ -28,7 +27,7 @@ export function AssignmentDialog({ onAddAssignment, initialTitle = '', initialDu
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    await onAddAssignment(newTitle, newDueDate);
+    await onAddAssignment(newTitle, newDueDate, courseId);
     if (setOpen) setOpen(false);
     setNewTitle('');
     setNewDueDate('');
