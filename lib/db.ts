@@ -238,7 +238,7 @@ export async function addItem<T>(table: Table<T>, item: T): Promise<string | num
 }
 
 export async function updateItem<T>(table: Table<T>, id: string | number, changes: Partial<T>): Promise<void> {
-  await table.update(id, { ...changes })
+  await table.update(id, changes as any);
 }
 
 export async function deleteItem<T>(table: Table<T>, id: string | number): Promise<void> {
@@ -304,7 +304,7 @@ export async function importGradesFromCSV(courseId: string, csvContent: string):
 }
 
 // Helper function to map grade types
-function mapGradeType(type: string): Grade['type'] {
+function mapGradeType(type: string): string {
   type = type.toLowerCase()
   if (type.includes('exam') || type.includes('test')) return 'exam'
   if (type.includes('quiz')) return 'quiz'

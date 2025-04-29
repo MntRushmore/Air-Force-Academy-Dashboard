@@ -1,8 +1,11 @@
 export type Exercise = {
-    id: string;
-    type: string;
-    value: number;
-    target_value: number;
-    created_at: string;
-    user_id?: string;
-  };
+  id: string;
+  name: string;
+  exercise_type: string;
+  unit: string;
+  value: number;
+  date: string;
+  user_id: string;       
+  target_value: number;   
+  created_at: string; 
+};

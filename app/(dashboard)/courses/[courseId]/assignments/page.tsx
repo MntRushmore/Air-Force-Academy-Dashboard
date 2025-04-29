@@ -32,13 +32,17 @@ export default function AssignmentsPage() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from<Assignment>('assignments')
+        .from('assignments')
         .select('*')
         .eq('course_id', courseId)
         .order('due_date', { ascending: true });
-
+  
       if (error) throw error;
-      setAssignments(data || []);
+      if (data) {
+        setAssignments(data as unknown as Assignment[]);
+      } else {
+        setAssignments([]);
+      }
     } catch (error) {
       console.error('Error loading assignments:', error);
       toast({

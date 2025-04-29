@@ -42,10 +42,10 @@ import { calculateApplicationProgress } from "@/lib/application-utils";
 import { useEffect, useState } from "react";
 
 export default function Dashboard() {
-  const courses = useLiveQuery<Course[]>(() => db.courses.toArray(), []) || [];
-  const grades = useLiveQuery<Grade[]>(() => db.grades.toArray(), []) || [];
-  const assignments = useLiveQuery<Assignment[]>(() => db.assignments.toArray(), []) || [];
-  const assignmentGrades = useLiveQuery<Grade[]>(() => db.grades.toArray(), []) || [];
+  const courses = (useLiveQuery(() => db.courses.toArray()) as unknown as Course[]) || [];
+  const grades = (useLiveQuery(() => db.grades.toArray()) as unknown as Grade[]) || [];
+  const assignments = (useLiveQuery(() => db.assignments.toArray()) as unknown as Assignment[]) || [];
+  const assignmentGrades = (useLiveQuery(() => db.grades.toArray()) as unknown as Grade[]) || [];
 
   // Weighted GPA calculation based on assignments and grades
   const calculateGPA = (
@@ -87,7 +87,7 @@ export default function Dashboard() {
   const [applicationProgress, setApplicationProgress] = useState(0);
 
   // Calculate fitness score
-  const fitnessScore = calculateCFAScore(exercises, gender);
+  const fitnessScore = calculateCFAScore((exercises as unknown) as Exercise[], gender);
 
   // Use effect to get gender preference from settings
   useEffect(() => {

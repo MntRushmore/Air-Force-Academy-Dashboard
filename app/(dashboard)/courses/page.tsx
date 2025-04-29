@@ -92,7 +92,7 @@ export default function CoursesPage() {
       if (!user) return;
 
       const { data, error } = await supabase
-        .from<Course, Course>("courses")
+        .from("courses")
         .select("*")
         .eq("user_id", user?.id)
         .order("year", { ascending: false })
@@ -101,7 +101,7 @@ export default function CoursesPage() {
 
       if (error) throw error;
 
-      setCourses(data || []);
+      setCourses((data as unknown as Course[]) || []);
     } catch (error) {
       console.error("Error fetching courses:", error);
       toast({
@@ -118,14 +118,16 @@ export default function CoursesPage() {
     try {
       if (!user) return;
       const { data, error } = await supabase
-        .from<Course, Course>("courses")
+        .from("courses")
         .insert([{ ...newCourse, user_id: user.id }])
         .select();
 
       if (error) throw error;
 
-      const newCourseData = data?.[0] as Course;
-      setCourses([...courses, newCourseData]);
+      const newCourseData = data?.[0];
+      if (newCourseData) {
+        setCourses([...courses, newCourseData as unknown as Course]);
+      }
 
       setNewCourse({
         name: "",
